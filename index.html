@@ -34,11 +34,13 @@
 
   .action-panel{padding:12px 28px;background:#111827;border-bottom:1px solid #1e293b;display:none;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap}
   .action-panel.visible{display:flex}
-  .action-panel input[type="date"],.action-panel input[type="text"]{background:#1e293b;border:1px solid #334155;color:#f8fafc;padding:4px 8px;border-radius:4px;font-size:13px;font-family:inherit}
-  .action-panel input[type="text"]{min-width:180px}
+  .panel-input{background:#1e293b;border:1px solid #334155;color:#f8fafc;padding:4px 8px;border-radius:4px;font-size:13px;font-family:inherit}
+  .panel-input-wide{min-width:200px}
+  .panel-input-note{min-width:140px}
   .action-panel select{background:#1e293b;border:1px solid #334155;color:#f8fafc;padding:4px 8px;border-radius:4px;font-size:13px;font-family:inherit}
   .action-panel label{color:#94a3b8;font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer}
   .action-panel input[type="checkbox"]{accent-color:#3b82f6}
+  .panel-label{color:#94a3b8;font-size:12px;flex-shrink:0}
   .btn-confirm{padding:4px 14px;background:#3b82f6;color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
   .btn-cancel{padding:4px 14px;background:transparent;color:#94a3b8;border:1px solid #334155;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
   .btn-delete-confirm{padding:4px 14px;background:#ef444420;color:#ef4444;border:1px solid #ef444440;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
@@ -80,6 +82,8 @@
   .list-date.locked{color:#94a3b8}
   .list-label{color:#e2e8f0;flex:1}
   .list-label.important{color:#f8fafc;font-weight:600}
+  .list-label.editable-label{cursor:pointer}
+  .list-label.editable-label:hover{text-decoration:underline;text-decoration-color:#334155;text-underline-offset:2px}
   .list-note{font-size:11px;color:#94a3b8}
   .btn-del{width:20px;height:20px;border-radius:4px;border:none;background:transparent;color:#475569;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;font-family:inherit;line-height:1}
   .btn-del:hover{background:#ef444420;color:#ef4444}
@@ -98,26 +102,33 @@
   <div class="legend" id="legendBar"></div>
 </div>
 
+<!-- Edit panel -->
 <div class="action-panel" id="editPanel">
-  <span style="color:#94a3b8">编辑：</span>
-  <span id="editLabel" style="color:#f8fafc;font-weight:600"></span>
-  <input type="date" id="editDateInput">
+  <span class="panel-label">编辑</span>
+  <span class="panel-label">日期</span>
+  <input type="date" class="panel-input" id="editDateInput">
+  <span class="panel-label">名称</span>
+  <input type="text" class="panel-input panel-input-wide" id="editLabelInput">
+  <span class="panel-label">备注</span>
+  <input type="text" class="panel-input panel-input-note" id="editNoteInput" placeholder="（可选）">
   <button class="btn-confirm" id="editConfirm">确认</button>
   <button class="btn-cancel" id="editCancel">取消</button>
 </div>
 
+<!-- Add panel -->
 <div class="action-panel" id="addPanel">
   <span style="color:#22c55e;font-weight:600">+ 新事件</span>
-  <input type="date" id="addDate">
-  <input type="text" id="addLabel" placeholder="事件名称">
+  <input type="date" class="panel-input" id="addDate">
+  <input type="text" class="panel-input panel-input-wide" id="addLabel" placeholder="事件名称">
   <select id="addType"><option value="dev">综合</option><option value="script">剧本</option><option value="art">美术</option><option value="music">音乐</option><option value="voice">配音</option><option value="marketing">宣发</option></select>
   <label><input type="checkbox" id="addFixed"> 锁定</label>
   <label><input type="checkbox" id="addImportant"> 重要</label>
-  <input type="text" id="addNote" placeholder="备注（可选）" style="min-width:120px">
+  <input type="text" class="panel-input panel-input-note" id="addNote" placeholder="备注（可选）">
   <button class="btn-confirm" id="addConfirm">添加</button>
   <button class="btn-cancel" id="addCancel">取消</button>
 </div>
 
+<!-- Delete panel -->
 <div class="action-panel" id="deletePanel">
   <span style="color:#ef4444;font-weight:600">确认删除：</span>
   <span id="deleteLabel" style="color:#f8fafc"></span>
@@ -141,7 +152,7 @@ const POLL_INTERVAL=IS_ADMIN?30000:15000;
 
 document.getElementById('modeBadge').className='mode-badge '+(IS_ADMIN?'mode-admin':'mode-viewer');
 document.getElementById('modeBadge').textContent=IS_ADMIN?'管理员':'只读';
-document.getElementById('listHeader').textContent=IS_ADMIN?'事件列表 · 点击日期编辑 · 拖拽调整 · × 删除':'事件列表';
+document.getElementById('listHeader').textContent=IS_ADMIN?'事件列表 · 点击名称或日期编辑 · 拖拽调整 · × 删除':'事件列表';
 
 const TYPES={
   script:{label:"剧本",color:"#06b6d4",bg:"#0c2a33",badgeBg:"rgba(6,182,212,0.15)"},
@@ -194,9 +205,9 @@ let nextId=100,filter="all",selectedId=null,deleteId=null,dragState=null;
 const START=new Date("2026-05-01"),END=new Date("2027-02-01");
 const TOTAL_DAYS=Math.ceil((END-START)/86400000);
 const TOTAL_WIDTH=2400;
-const DRAG_SNAP=10; // pixel snap for vertical drag
-const CARD_W=170; // estimated card width for collision
-const CARD_GAP=8; // vertical gap between cards
+const DRAG_SNAP=10;
+const CARD_W=170;
+const CARD_GAP=8;
 const MONTH_NAMES=["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
 
 function daysBetween(a,b){return Math.ceil((b-a)/86400000)}
@@ -206,78 +217,38 @@ function formatDate(s){const d=new Date(s+"T00:00:00");return`${d.getMonth()+1}/
 function getMonths(){const m=[];let c=new Date(START);while(c<END){m.push(new Date(c));c=new Date(c.getFullYear(),c.getMonth()+1,1)}return m}
 function getFiltered(){return events.filter(ev=>{if(filter==="all")return true;if(ev.type==="launch")return true;return ev.type===filter}).sort((a,b)=>a.date.localeCompare(b.date))}
 
-// Estimate card height in pixels (from top of event-node to bottom of card)
-function cardH(ev){
-  let h=14; // stem+dot to card top
-  h+=12; // date label
-  h+=16; // title
-  if(ev.important)h+=14; // wrapped title extra line
-  if(ev.note)h+=13; // note
-  h+=10; // card padding
-  return h;
-}
+function cardH(ev){let h=14;h+=12;h+=16;if(ev.important)h+=14;if(ev.note)h+=13;h+=10;return h}
 
-// Pixel-perfect auto-layout with tight packing
 function layoutEvents(evts){
-  const placed=[]; // {left,right,top,bottom,id}
-
-  // Pass 1: place manually positioned events (customTop in pixels)
+  const placed=[];
   const result=evts.map(ev=>{
     if(typeof ev.customTop==='number'){
-      const x=dateToPos(ev.date);
-      const h=cardH(ev);
+      const x=dateToPos(ev.date);const h=cardH(ev);
       placed.push({left:x-10,right:x+CARD_W,top:ev.customTop,bottom:ev.customTop+h,id:ev.id});
       return{...ev,pxTop:ev.customTop};
     }
     return{...ev,pxTop:-1};
   });
-
-  // Pass 2: auto-place remaining, pack tightly
   for(let i=0;i<result.length;i++){
     if(result[i].pxTop!==-1)continue;
-    const ev=result[i];
-    const x=dateToPos(ev.date);
-    const h=cardH(ev);
+    const ev=result[i];const x=dateToPos(ev.date);const h=cardH(ev);
     const left=x-10,right=x+CARD_W;
-
-    // Find all placed cards that overlap horizontally with this one
     const hOverlaps=placed.filter(p=>left<p.right&&right>p.left);
-
-    // Try y=0 first, then find the lowest available slot
     let y=0;
     if(hOverlaps.length>0){
-      // Sort by top position
       hOverlaps.sort((a,b)=>a.top-b.top);
-      // Try to fit in gaps between existing cards
-      y=0;
       let settled=false;
-      // Check if we fit above all overlapping cards
-      if(y+h<=hOverlaps[0].top-CARD_GAP||hOverlaps[0].top>=y+h+CARD_GAP){
-        // Check no actual overlap at y=0
-        const anyOverlap=hOverlaps.some(p=>y<p.bottom+CARD_GAP&&y+h>p.top-CARD_GAP);
-        if(!anyOverlap)settled=true;
-      }
-      if(!settled){
-        // Try placing just below each overlapping card
-        for(const p of hOverlaps){
-          y=p.bottom+CARD_GAP;
-          const anyOverlap=hOverlaps.some(pp=>y<pp.bottom+CARD_GAP&&y+h>pp.top-CARD_GAP);
-          if(!anyOverlap){settled=true;break;}
-        }
-      }
-      if(!settled){
-        // Fallback: place below everything
-        y=Math.max(...hOverlaps.map(p=>p.bottom))+CARD_GAP;
-      }
+      const noOverlapAt=yy=>!hOverlaps.some(p=>yy<p.bottom+CARD_GAP&&yy+h>p.top-CARD_GAP);
+      if(noOverlapAt(0)){settled=true;y=0}
+      if(!settled){for(const p of hOverlaps){y=p.bottom+CARD_GAP;if(noOverlapAt(y)){settled=true;break}}}
+      if(!settled){y=Math.max(...hOverlaps.map(p=>p.bottom))+CARD_GAP}
     }
-
     placed.push({left,right,top:y,bottom:y+h,id:ev.id});
     result[i]={...ev,pxTop:y};
   }
   return result;
 }
 
-// === FIREBASE ===
 function setSyncStatus(ok,msg){document.getElementById('syncStatus').innerHTML=`<span class="sync-dot ${ok?'sync-ok':'sync-loading'}"></span>${msg}`}
 async function firebaseSave(){if(!IS_ADMIN)return;setSyncStatus(false,'保存中...');try{await fetch(DB_URL+'/timeline.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({events,nextId})});setSyncStatus(true,'已同步')}catch(e){setSyncStatus(false,'同步失败')}}
 async function firebaseLoad(){setSyncStatus(false,'加载中...');try{const r=await fetch(DB_URL+'/timeline.json');const data=await r.json();if(data&&data.events){events=data.events;if(data.nextId)nextId=data.nextId;setSyncStatus(true,'已同步');return true}}catch(e){setSyncStatus(false,'连接失败')}return false}
@@ -333,7 +304,7 @@ function render(){
     const cls=['event-node',canDrag?'draggable':'',selectedId===ev.id?'selected':''].filter(Boolean).join(' ');
     const ds=`border-color:${t.color};${ev.important?`background:${t.color};box-shadow:0 0 8px ${t.color}50;`:'background:transparent;'}`;
     const cbs=ev.fixed?'dashed':'solid';const cbc=selectedId===ev.id?'#f59e0b':`${t.color}40`;
-    html+=`<div class="${cls}" data-id="${ev.id}" data-fixed="${ev.fixed?1:0}" style="left:${pos-4}px;top:${ev.pxTop}px">`;
+    html+=`<div class="${cls}" data-id="${ev.id}" style="left:${pos-4}px;top:${ev.pxTop}px">`;
     html+=`<div class="event-stem" style="background:${t.color}"></div><div class="event-dot" style="${ds}"></div>`;
     html+=`<div class="event-card" style="background:${t.bg};border:1px ${cbs} ${cbc}">`;
     html+=`<div class="date-label">${formatDate(ev.date)}<span class="type-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>${ev.fixed?'<span class="lock-icon">🔒</span>':''}</div>`;
@@ -351,7 +322,8 @@ function render(){
     lh+=`<span class="list-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>`;
     const dateClass=IS_ADMIN&&!ev.fixed?'editable':'locked';
     lh+=`<span class="list-date ${dateClass}" data-id="${ev.id}">${formatDate(ev.date)}</span>`;
-    lh+=`<span class="list-label${ev.important?' important':''}">${ev.label}</span>`;
+    const labelClass=IS_ADMIN?'editable-label':'';
+    lh+=`<span class="list-label${ev.important?' important':''} ${labelClass}" data-edit-id="${ev.id}">${ev.label}</span>`;
     if(ev.fixed)lh+=`<span style="font-size:9px;color:#f59e0b">🔒</span>`;
     if(ev.note)lh+=`<span class="list-note">(${ev.note})</span>`;
     if(IS_ADMIN)lh+=`<button class="btn-del" data-del-id="${ev.id}" title="删除">×</button>`;
@@ -362,78 +334,52 @@ function render(){
   if(IS_ADMIN){
     document.querySelectorAll('.event-node.draggable').forEach(el=>{el.addEventListener('mousedown',onDragStart);el.addEventListener('touchstart',onTouchStart,{passive:false})});
     document.querySelectorAll('.list-date.editable').forEach(el=>{el.addEventListener('click',()=>openEdit(parseInt(el.dataset.id)))});
-    document.querySelectorAll('.event-node.draggable .event-card').forEach(el=>{el.addEventListener('click',()=>{if(dragState&&dragState.moved)return;const id=parseInt(el.closest('.event-node').dataset.id);const ev=events.find(e=>e.id===id);if(!ev.fixed)openEdit(id)})});
+    document.querySelectorAll('.list-label.editable-label').forEach(el=>{el.addEventListener('click',()=>openEdit(parseInt(el.dataset.editId)))});
+    document.querySelectorAll('.event-node.draggable .event-card').forEach(el=>{el.addEventListener('click',()=>{if(dragState&&dragState.moved)return;openEdit(parseInt(el.closest('.event-node').dataset.id))})});
     document.querySelectorAll('.btn-del').forEach(el=>{el.addEventListener('click',(e)=>{e.stopPropagation();openDelete(parseInt(el.dataset.delId))})});
   }
 }
 
-function openEdit(id){if(!IS_ADMIN)return;const ev=events.find(e=>e.id===id);if(!ev||ev.fixed)return;selectedId=id;deleteId=null;showPanel('edit');document.getElementById('editLabel').textContent=ev.label;document.getElementById('editDateInput').value=ev.date;render()}
+function openEdit(id){
+  if(!IS_ADMIN)return;
+  const ev=events.find(e=>e.id===id);
+  if(!ev)return;
+  selectedId=id;deleteId=null;showPanel('edit');
+  document.getElementById('editDateInput').value=ev.date;
+  document.getElementById('editDateInput').disabled=!!ev.fixed;
+  document.getElementById('editLabelInput').value=ev.label;
+  document.getElementById('editNoteInput').value=ev.note||'';
+  render();
+}
 function openDelete(id){if(!IS_ADMIN)return;const ev=events.find(e=>e.id===id);if(!ev)return;deleteId=id;selectedId=null;showPanel('delete');document.getElementById('deleteLabel').textContent=`${formatDate(ev.date)} — ${ev.label}`;render()}
 function closeAll(){selectedId=null;deleteId=null;showPanel(null);render()}
 
-// === DRAG ===
-function onDragStart(e){
-  if(!IS_ADMIN)return;
-  const el=e.currentTarget,id=parseInt(el.dataset.id);
-  const ev=events.find(e=>e.id===id);
-  e.preventDefault();
-  const isFixed=ev.fixed;
-  // Get current pixel top from the rendered element
-  const currentTop=parseInt(el.style.top)||0;
-  dragState={id,startX:e.clientX,startY:e.clientY,startPos:dateToPos(ev.date),startTop:currentTop,moved:false,isFixed};
-  el.classList.add('dragging');
-  document.addEventListener('mousemove',onDragMove);
-  document.addEventListener('mouseup',onDragEnd);
-}
-function onDragMove(e){
-  if(!dragState)return;
-  const dx=e.clientX-dragState.startX,dy=e.clientY-dragState.startY;
-  if(Math.abs(dx)>3||Math.abs(dy)>3)dragState.moved=true;
-  const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);
-  if(!el)return;
-  let newPos=dragState.startPos;
-  if(!dragState.isFixed){
-    newPos=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));
-    const nd=posToDate(newPos);
-    events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev);
-    const dl=el.querySelector('.date-label');
-    if(dl){const ev=events.find(e=>e.id===dragState.id),t=TYPES[ev.type];dl.innerHTML=`${formatDate(nd)}<span class="type-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>${ev.fixed?'<span class="lock-icon">🔒</span>':''}`}
-  }
-  // Vertical: free pixel movement, snap to DRAG_SNAP grid
-  const rawTop=Math.max(0,dragState.startTop+dy);
-  const snappedTop=Math.round(rawTop/DRAG_SNAP)*DRAG_SNAP;
-  events=events.map(ev=>ev.id===dragState.id?{...ev,customTop:snappedTop}:ev);
-  el.style.left=((!dragState.isFixed?newPos:dateToPos(events.find(e=>e.id===dragState.id).date))-4)+'px';
-  el.style.top=snappedTop+'px';
-  el.style.transition='none';
-}
-function onDragEnd(){
-  if(dragState){const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(el)el.classList.remove('dragging')}
-  document.removeEventListener('mousemove',onDragMove);document.removeEventListener('mouseup',onDragEnd);
-  const wm=dragState?.moved;dragState=null;if(wm){firebaseSave();render()}
-}
-function onTouchStart(e){
-  if(!IS_ADMIN)return;const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);
-  const t=e.touches[0];const isFixed=ev.fixed;const currentTop=parseInt(el.style.top)||0;
-  dragState={id,startX:t.clientX,startY:t.clientY,startPos:dateToPos(ev.date),startTop:currentTop,moved:false,isFixed};
-  el.classList.add('dragging');document.addEventListener('touchmove',onTouchMove,{passive:false});document.addEventListener('touchend',onTouchEnd);
-}
-function onTouchMove(e){
-  if(!dragState)return;e.preventDefault();const t=e.touches[0],dx=t.clientX-dragState.startX,dy=t.clientY-dragState.startY;
-  if(Math.abs(dx)>3||Math.abs(dy)>3)dragState.moved=true;
-  const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(!el)return;
-  let newPos=dragState.startPos;
-  if(!dragState.isFixed){newPos=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));const nd=posToDate(newPos);events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev)}
-  const rawTop=Math.max(0,dragState.startTop+dy);const snappedTop=Math.round(rawTop/DRAG_SNAP)*DRAG_SNAP;
-  events=events.map(ev=>ev.id===dragState.id?{...ev,customTop:snappedTop}:ev);
-  el.style.left=((!dragState.isFixed?newPos:dateToPos(events.find(e=>e.id===dragState.id).date))-4)+'px';
-  el.style.top=snappedTop+'px';el.style.transition='none';
-}
+function onDragStart(e){if(!IS_ADMIN)return;const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);e.preventDefault();const isFixed=ev.fixed;const currentTop=parseInt(el.style.top)||0;dragState={id,startX:e.clientX,startY:e.clientY,startPos:dateToPos(ev.date),startTop:currentTop,moved:false,isFixed};el.classList.add('dragging');document.addEventListener('mousemove',onDragMove);document.addEventListener('mouseup',onDragEnd)}
+function onDragMove(e){if(!dragState)return;const dx=e.clientX-dragState.startX,dy=e.clientY-dragState.startY;if(Math.abs(dx)>3||Math.abs(dy)>3)dragState.moved=true;const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(!el)return;let newPos=dragState.startPos;if(!dragState.isFixed){newPos=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));const nd=posToDate(newPos);events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev);const dl=el.querySelector('.date-label');if(dl){const ev=events.find(e=>e.id===dragState.id),t=TYPES[ev.type];dl.innerHTML=`${formatDate(nd)}<span class="type-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>${ev.fixed?'<span class="lock-icon">🔒</span>':''}`}}const rawTop=Math.max(0,dragState.startTop+dy);const snappedTop=Math.round(rawTop/DRAG_SNAP)*DRAG_SNAP;events=events.map(ev=>ev.id===dragState.id?{...ev,customTop:snappedTop}:ev);el.style.left=((!dragState.isFixed?newPos:dateToPos(events.find(e=>e.id===dragState.id).date))-4)+'px';el.style.top=snappedTop+'px';el.style.transition='none'}
+function onDragEnd(){if(dragState){const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(el)el.classList.remove('dragging')}document.removeEventListener('mousemove',onDragMove);document.removeEventListener('mouseup',onDragEnd);const wm=dragState?.moved;dragState=null;if(wm){firebaseSave();render()}}
+function onTouchStart(e){if(!IS_ADMIN)return;const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);const t=e.touches[0];const isFixed=ev.fixed;const currentTop=parseInt(el.style.top)||0;dragState={id,startX:t.clientX,startY:t.clientY,startPos:dateToPos(ev.date),startTop:currentTop,moved:false,isFixed};el.classList.add('dragging');document.addEventListener('touchmove',onTouchMove,{passive:false});document.addEventListener('touchend',onTouchEnd)}
+function onTouchMove(e){if(!dragState)return;e.preventDefault();const t=e.touches[0],dx=t.clientX-dragState.startX,dy=t.clientY-dragState.startY;if(Math.abs(dx)>3||Math.abs(dy)>3)dragState.moved=true;const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(!el)return;let newPos=dragState.startPos;if(!dragState.isFixed){newPos=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));const nd=posToDate(newPos);events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev)}const rawTop=Math.max(0,dragState.startTop+dy);const snappedTop=Math.round(rawTop/DRAG_SNAP)*DRAG_SNAP;events=events.map(ev=>ev.id===dragState.id?{...ev,customTop:snappedTop}:ev);el.style.left=((!dragState.isFixed?newPos:dateToPos(events.find(e=>e.id===dragState.id).date))-4)+'px';el.style.top=snappedTop+'px';el.style.transition='none'}
 function onTouchEnd(){document.removeEventListener('touchmove',onTouchMove);document.removeEventListener('touchend',onTouchEnd);dragState=null;firebaseSave();render()}
 
-// === PANELS ===
-document.getElementById('editConfirm').addEventListener('click',async()=>{const nd=document.getElementById('editDateInput').value;if(nd&&selectedId){events=events.map(ev=>ev.id===selectedId?{...ev,date:nd}:ev);await firebaseSave();closeAll()}});
+// Edit: save date + label + note
+document.getElementById('editConfirm').addEventListener('click',async()=>{
+  if(!selectedId)return;
+  const nd=document.getElementById('editDateInput').value;
+  const nl=document.getElementById('editLabelInput').value.trim();
+  const nn=document.getElementById('editNoteInput').value.trim();
+  if(!nl){alert('名称不能为空');return}
+  events=events.map(ev=>{
+    if(ev.id!==selectedId)return ev;
+    const updated={...ev,label:nl};
+    if(!ev.fixed)updated.date=nd;
+    if(nn)updated.note=nn;else delete updated.note;
+    return updated;
+  });
+  await firebaseSave();closeAll();
+});
 document.getElementById('editCancel').addEventListener('click',closeAll);
+
+// Add
 document.getElementById('addConfirm').addEventListener('click',async()=>{
   const date=document.getElementById('addDate').value,label=document.getElementById('addLabel').value.trim();
   const type=document.getElementById('addType').value,fixed=document.getElementById('addFixed').checked;
@@ -443,6 +389,8 @@ document.getElementById('addConfirm').addEventListener('click',async()=>{
   events.push(ev);await firebaseSave();showPanel(null);render();
 });
 document.getElementById('addCancel').addEventListener('click',()=>{showPanel(null)});
+
+// Delete
 document.getElementById('deleteConfirm').addEventListener('click',async()=>{if(deleteId){events=events.filter(ev=>ev.id!==deleteId);await firebaseSave();closeAll()}});
 document.getElementById('deleteCancel').addEventListener('click',closeAll);
 
