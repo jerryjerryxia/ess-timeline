@@ -7,7 +7,7 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#0a0e17;color:#e2e8f0;font-family:'Noto Sans SC',system-ui,sans-serif;overflow-x:hidden}
+  body{background:linear-gradient(rgba(10,14,23,0.88),rgba(10,14,23,0.88)),url('main_cap.png') center/cover no-repeat fixed #0a0e17;color:#e2e8f0;font-family:'Noto Sans SC',system-ui,sans-serif;overflow-x:hidden}
   .header{padding:24px 28px 16px;border-bottom:1px solid #1e293b}
   .header-top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
   .header h1{font-size:20px;font-weight:700;letter-spacing:-0.5px;color:#f8fafc}
@@ -111,6 +111,7 @@
   <input type="text" class="panel-input panel-input-wide" id="editLabelInput">
   <span class="panel-label">备注</span>
   <input type="text" class="panel-input panel-input-note" id="editNoteInput" placeholder="（可选）">
+  <label><input type="checkbox" id="editFixed"> 锁定</label>
   <button class="btn-confirm" id="editConfirm">确认</button>
   <button class="btn-cancel" id="editCancel">取消</button>
 </div>
@@ -367,8 +368,11 @@ function openEdit(id){
   const ev=events.find(e=>e.id===id);
   if(!ev)return;
   selectedId=id;deleteId=null;showPanel('edit');
-  document.getElementById('editDateInput').value=ev.date;
-  document.getElementById('editDateInput').disabled=!!ev.fixed;
+  const dateEl=document.getElementById('editDateInput'),fxEl=document.getElementById('editFixed');
+  dateEl.value=ev.date;
+  fxEl.checked=!!ev.fixed;
+  dateEl.disabled=fxEl.checked;
+  fxEl.onchange=()=>{dateEl.disabled=fxEl.checked};
   document.getElementById('editLabelInput').value=ev.label;
   document.getElementById('editNoteInput').value=ev.note||'';
   render();
@@ -389,11 +393,11 @@ document.getElementById('editConfirm').addEventListener('click',async()=>{
   const nd=document.getElementById('editDateInput').value;
   const nl=document.getElementById('editLabelInput').value.trim();
   const nn=document.getElementById('editNoteInput').value.trim();
+  const nf=document.getElementById('editFixed').checked;
   if(!nl){alert('名称不能为空');return}
   events=events.map(ev=>{
     if(ev.id!==selectedId)return ev;
-    const updated={...ev,label:nl};
-    if(!ev.fixed)updated.date=nd;
+    const updated={...ev,label:nl,date:nd,fixed:nf};
     if(nn)updated.note=nn;else delete updated.note;
     return updated;
   });
