@@ -43,6 +43,8 @@
   .panel-label{color:#94a3b8;font-size:12px;flex-shrink:0}
   .btn-confirm{padding:4px 14px;background:#3b82f6;color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
   .btn-cancel{padding:4px 14px;background:transparent;color:#94a3b8;border:1px solid #334155;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
+  .btn-delete{padding:4px 14px;background:#ef444420;color:#ef4444;border:1px solid #ef444440;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit;margin-left:auto}
+  .btn-delete:hover{background:#ef444440}
 
   .timeline-scroll{overflow-x:auto;overflow-y:auto;position:relative}
   .timeline-canvas{position:relative;padding:0 0 40px}
@@ -111,6 +113,7 @@
   <input type="text" class="panel-input panel-input-note" id="editNoteInput" placeholder="备注（可选）">
   <button class="btn-confirm" id="editConfirm">确认</button>
   <button class="btn-cancel" id="editCancel">取消</button>
+  <button class="btn-delete" id="editDelete">删除</button>
 </div>
 
 <!-- Add panel -->
@@ -367,7 +370,7 @@ function openEdit(id){
   document.getElementById('editNoteInput').value=ev.note||'';
   render();
 }
-async function openDelete(id){if(!IS_ADMIN)return;const ev=events.find(e=>e.id===id);if(!ev)return;if(!confirm(`确认删除"${ev.label}"（${formatDate(ev.date)}）？`))return;events=events.filter(e=>e.id!==id);await firebaseSave();render()}
+async function openDelete(id){if(!IS_ADMIN)return;const ev=events.find(e=>e.id===id);if(!ev)return;if(!confirm(`确认删除"${ev.label}"（${formatDate(ev.date)}）？`))return;events=events.filter(e=>e.id!==id);await firebaseSave();closeAll()}
 function closeAll(){selectedId=null;showPanel(null);render()}
 
 function onDragStart(e){if(!IS_ADMIN)return;const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);e.preventDefault();const isFixed=ev.fixed;const currentTop=parseInt(el.style.top)||0;dragState={id,startX:e.clientX,startY:e.clientY,startPos:dateToPos(ev.date),startTop:currentTop,moved:false,isFixed};el.classList.add('dragging');document.addEventListener('mousemove',onDragMove);document.addEventListener('mouseup',onDragEnd)}
@@ -397,6 +400,7 @@ document.getElementById('editConfirm').addEventListener('click',async()=>{
   await firebaseSave();closeAll();
 });
 document.getElementById('editCancel').addEventListener('click',closeAll);
+document.getElementById('editDelete').addEventListener('click',()=>{if(selectedId)openDelete(selectedId)});
 
 // Add
 document.getElementById('addConfirm').addEventListener('click',async()=>{
