@@ -151,8 +151,7 @@ const DB_URL='https://ess-timeline-default-rtdb.firebaseio.com';
 const IS_ADMIN=new URLSearchParams(window.location.search).has('admin');
 const POLL_INTERVAL=IS_ADMIN?30000:15000;
 
-document.getElementById('modeBadge').className='mode-badge '+(IS_ADMIN?'mode-admin':'mode-viewer');
-document.getElementById('modeBadge').textContent=IS_ADMIN?'管理员':'只读';
+if(IS_ADMIN){document.getElementById('modeBadge').className='mode-badge mode-admin';document.getElementById('modeBadge').textContent='管理员'}
 document.getElementById('listHeader').textContent=IS_ADMIN?'事件列表 · 点击名称或日期编辑 · 拖拽调整 · × 删除':'事件列表';
 
 const TYPES={
