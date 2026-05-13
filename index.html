@@ -43,8 +43,6 @@
   .panel-label{color:#94a3b8;font-size:12px;flex-shrink:0}
   .btn-confirm{padding:4px 14px;background:#3b82f6;color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
   .btn-cancel{padding:4px 14px;background:transparent;color:#94a3b8;border:1px solid #334155;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
-  .btn-delete-confirm{padding:4px 14px;background:#ef444420;color:#ef4444;border:1px solid #ef444440;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
-  .btn-delete-confirm:hover{background:#ef444440}
 
   .timeline-scroll{overflow-x:auto;overflow-y:auto;position:relative}
   .timeline-canvas{position:relative;padding:0 0 40px}
@@ -128,14 +126,6 @@
   <button class="btn-cancel" id="addCancel">取消</button>
 </div>
 
-<!-- Delete panel -->
-<div class="action-panel" id="deletePanel">
-  <span style="color:#ef4444;font-weight:600">确认删除：</span>
-  <span id="deleteLabel" style="color:#f8fafc"></span>
-  <button class="btn-delete-confirm" id="deleteConfirm">删除</button>
-  <button class="btn-cancel" id="deleteCancel">取消</button>
-</div>
-
 <div class="timeline-scroll" id="timelineScroll">
   <div class="timeline-canvas" id="timelineCanvas"></div>
 </div>
@@ -199,7 +189,7 @@ const INITIAL_EVENTS=[
 ];
 
 let events=JSON.parse(JSON.stringify(INITIAL_EVENTS));
-let nextId=100,filter="all",selectedId=null,deleteId=null,dragState=null;
+let nextId=100,filter="all",selectedId=null,dragState=null;
 
 const START=new Date("2026-05-01"),END=new Date("2027-02-01");
 const TOTAL_DAYS=Math.ceil((END-START)/86400000);
@@ -280,7 +270,7 @@ async function init(){
   setInterval(async()=>{if(!dragState){await firebaseLoad();render()}},POLL_INTERVAL);
 }
 
-function showPanel(name){['editPanel','addPanel','deletePanel'].forEach(id=>document.getElementById(id).classList.remove('visible'));if(name)document.getElementById(name+'Panel').classList.add('visible')}
+function showPanel(name){['editPanel','addPanel'].forEach(id=>document.getElementById(id).classList.remove('visible'));if(name)document.getElementById(name+'Panel').classList.add('visible')}
 
 function buildFilterBar(){
   const bar=document.getElementById('filterBar');let h='';
@@ -377,8 +367,8 @@ function openEdit(id){
   document.getElementById('editNoteInput').value=ev.note||'';
   render();
 }
-function openDelete(id){if(!IS_ADMIN)return;const ev=events.find(e=>e.id===id);if(!ev)return;deleteId=id;selectedId=null;showPanel('delete');document.getElementById('deleteLabel').textContent=`${formatDate(ev.date)} — ${ev.label}`;render()}
-function closeAll(){selectedId=null;deleteId=null;showPanel(null);render()}
+async function openDelete(id){if(!IS_ADMIN)return;const ev=events.find(e=>e.id===id);if(!ev)return;if(!confirm(`确认删除"${ev.label}"（${formatDate(ev.date)}）？`))return;events=events.filter(e=>e.id!==id);await firebaseSave();render()}
+function closeAll(){selectedId=null;showPanel(null);render()}
 
 function onDragStart(e){if(!IS_ADMIN)return;const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);e.preventDefault();const isFixed=ev.fixed;const currentTop=parseInt(el.style.top)||0;dragState={id,startX:e.clientX,startY:e.clientY,startPos:dateToPos(ev.date),startTop:currentTop,moved:false,isFixed};el.classList.add('dragging');document.addEventListener('mousemove',onDragMove);document.addEventListener('mouseup',onDragEnd)}
 function onDragMove(e){if(!dragState)return;const dx=e.clientX-dragState.startX,dy=e.clientY-dragState.startY;if(Math.abs(dx)>3||Math.abs(dy)>3)dragState.moved=true;const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(!el)return;let newPos=dragState.startPos;if(!dragState.isFixed){newPos=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));const nd=posToDate(newPos);events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev);const dl=el.querySelector('.date-label');if(dl){const ev=events.find(e=>e.id===dragState.id),t=TYPES[ev.type];dl.innerHTML=`${formatDate(nd)}<span class="type-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>${ev.fixed?'<span class="lock-icon">🔒</span>':''}`}}const rawTop=Math.max(0,dragState.startTop+dy);const snappedTop=Math.round(rawTop/DRAG_SNAP)*DRAG_SNAP;events=events.map(ev=>ev.id===dragState.id?{...ev,customTop:snappedTop}:ev);el.style.left=((!dragState.isFixed?newPos:dateToPos(events.find(e=>e.id===dragState.id).date))-4)+'px';el.style.top=snappedTop+'px';el.style.transition='none'}
@@ -418,10 +408,6 @@ document.getElementById('addConfirm').addEventListener('click',async()=>{
   events.push(ev);await firebaseSave();showPanel(null);render();
 });
 document.getElementById('addCancel').addEventListener('click',()=>{showPanel(null)});
-
-// Delete
-document.getElementById('deleteConfirm').addEventListener('click',async()=>{if(deleteId){events=events.filter(ev=>ev.id!==deleteId);await firebaseSave();closeAll()}});
-document.getElementById('deleteCancel').addEventListener('click',closeAll);
 
 init();
 </script>
