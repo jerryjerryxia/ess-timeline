@@ -105,13 +105,12 @@
 <!-- Edit panel -->
 <div class="action-panel" id="editPanel">
   <span class="panel-label">编辑</span>
-  <span class="panel-label">日期</span>
   <input type="date" class="panel-input" id="editDateInput">
-  <span class="panel-label">名称</span>
-  <input type="text" class="panel-input panel-input-wide" id="editLabelInput">
-  <span class="panel-label">备注</span>
-  <input type="text" class="panel-input panel-input-note" id="editNoteInput" placeholder="（可选）">
+  <input type="text" class="panel-input panel-input-wide" id="editLabelInput" placeholder="事件名称">
+  <select id="editType"><option value="dev">综合</option><option value="script">剧本</option><option value="art">美术</option><option value="music">音乐</option><option value="voice">配音</option><option value="marketing">宣发</option><option value="launch">发售</option></select>
   <label><input type="checkbox" id="editFixed"> 锁定</label>
+  <label><input type="checkbox" id="editImportant"> 重要</label>
+  <input type="text" class="panel-input panel-input-note" id="editNoteInput" placeholder="备注（可选）">
   <button class="btn-confirm" id="editConfirm">确认</button>
   <button class="btn-cancel" id="editCancel">取消</button>
 </div>
@@ -121,7 +120,7 @@
   <span style="color:#22c55e;font-weight:600">+ 新事件</span>
   <input type="date" class="panel-input" id="addDate">
   <input type="text" class="panel-input panel-input-wide" id="addLabel" placeholder="事件名称">
-  <select id="addType"><option value="dev">综合</option><option value="script">剧本</option><option value="art">美术</option><option value="music">音乐</option><option value="voice">配音</option><option value="marketing">宣发</option></select>
+  <select id="addType"><option value="dev">综合</option><option value="script">剧本</option><option value="art">美术</option><option value="music">音乐</option><option value="voice">配音</option><option value="marketing">宣发</option><option value="launch">发售</option></select>
   <label><input type="checkbox" id="addFixed"> 锁定</label>
   <label><input type="checkbox" id="addImportant"> 重要</label>
   <input type="text" class="panel-input panel-input-note" id="addNote" placeholder="备注（可选）">
@@ -373,6 +372,8 @@ function openEdit(id){
   dateEl.disabled=fxEl.checked;
   fxEl.onchange=()=>{dateEl.disabled=fxEl.checked};
   document.getElementById('editLabelInput').value=ev.label;
+  document.getElementById('editType').value=ev.type;
+  document.getElementById('editImportant').checked=!!ev.important;
   document.getElementById('editNoteInput').value=ev.note||'';
   render();
 }
@@ -393,10 +394,13 @@ document.getElementById('editConfirm').addEventListener('click',async()=>{
   const nl=document.getElementById('editLabelInput').value.trim();
   const nn=document.getElementById('editNoteInput').value.trim();
   const nf=document.getElementById('editFixed').checked;
+  const nt=document.getElementById('editType').value;
+  const ni=document.getElementById('editImportant').checked;
   if(!nl){alert('名称不能为空');return}
   events=events.map(ev=>{
     if(ev.id!==selectedId)return ev;
-    const updated={...ev,label:nl,date:nd,fixed:nf};
+    const updated={...ev,label:nl,date:nd,fixed:nf,type:nt};
+    if(ni)updated.important=true;else delete updated.important;
     if(nn)updated.note=nn;else delete updated.note;
     return updated;
   });
