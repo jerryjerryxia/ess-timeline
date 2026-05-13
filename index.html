@@ -12,6 +12,13 @@
   .header-top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
   .header h1{font-size:20px;font-weight:700;letter-spacing:-0.5px;color:#f8fafc}
   .header .subtitle{font-size:12px;color:#64748b;margin-top:4px}
+  .mode-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;margin-left:8px}
+  .mode-admin{background:#22c55e20;color:#22c55e;border:1px solid #22c55e40}
+  .mode-viewer{background:#3b82f620;color:#3b82f6;border:1px solid #3b82f640}
+  .sync-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px}
+  .sync-ok{background:#22c55e}
+  .sync-loading{background:#f59e0b;animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
   .controls{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
   .filter-btn{padding:4px 10px;font-size:11px;font-weight:500;background:transparent;color:#64748b;border:1px solid #1e293b;border-radius:5px;cursor:pointer;font-family:inherit;transition:all 0.2s;display:flex;align-items:center;gap:4px}
   .filter-btn.active{background:#1e293b;color:#f8fafc;border-color:#334155}
@@ -46,7 +53,8 @@
   .today-line{position:absolute;top:36px;bottom:0;width:2px;background:linear-gradient(180deg,#f59e0b 0%,rgba(245,158,11,0.1) 100%);z-index:15}
   .today-label{position:absolute;top:40px;z-index:16;background:#f59e0b;color:#000;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap}
 
-  .event-node{position:absolute;z-index:10;user-select:none;transition:left 0.3s ease}
+  .row-guide{position:absolute;left:0;right:0;height:1px;background:rgba(59,130,246,0.15);z-index:5;pointer-events:none;display:none}
+  .event-node{position:absolute;z-index:10;user-select:none;transition:left 0.3s ease,top 0.3s ease}
   .event-node.dragging{z-index:30;transition:none}
   .event-node.draggable{cursor:grab}
   .event-node.draggable:active{cursor:grabbing}
@@ -83,8 +91,8 @@
 <div class="header">
   <div class="header-top">
     <div>
-      <h1>无休夏日综合征 · 制作时间线</h1>
-      <div class="subtitle">Endless Summer Syndrome — Development & Marketing Timeline</div>
+      <h1>无休夏日综合征 · 制作时间线 <span class="mode-badge" id="modeBadge"></span></h1>
+      <div class="subtitle">Endless Summer Syndrome — <span id="syncStatus"><span class="sync-dot sync-loading"></span>连接中...</span></div>
     </div>
     <div class="controls" id="filterBar"></div>
   </div>
@@ -123,11 +131,21 @@
 </div>
 
 <div class="event-list">
-  <h2>事件列表 · 点击日期可编辑 · 点击 × 可删除</h2>
+  <h2 id="listHeader">事件列表</h2>
   <div id="eventListContainer"></div>
 </div>
 
 <script>
+// === CONFIG ===
+const DB_URL = 'https://ess-timeline-default-rtdb.firebaseio.com';
+const IS_ADMIN = new URLSearchParams(window.location.search).has('admin');
+const POLL_INTERVAL = IS_ADMIN ? 30000 : 15000;
+
+// Mode badge
+document.getElementById('modeBadge').className = 'mode-badge ' + (IS_ADMIN ? 'mode-admin' : 'mode-viewer');
+document.getElementById('modeBadge').textContent = IS_ADMIN ? '管理员' : '只读';
+document.getElementById('listHeader').textContent = IS_ADMIN ? '事件列表 · 点击日期编辑 · 拖拽调整 · × 删除' : '事件列表';
+
 const TYPES={
   script:{label:"剧本",color:"#06b6d4",bg:"#0c2a33",badgeBg:"rgba(6,182,212,0.15)"},
   art:{label:"美术",color:"#ec4899",bg:"#2d1527",badgeBg:"rgba(236,72,153,0.15)"},
@@ -173,29 +191,12 @@ const INITIAL_EVENTS=[
   {id:27,date:"2027-01-19",label:"🚀 发售",type:"launch",fixed:true,important:true},
 ];
 
-const STORAGE_KEY = 'ess_timeline_events';
-const STORAGE_ID_KEY = 'ess_timeline_nextid';
-
-function saveToStorage() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(events)); localStorage.setItem(STORAGE_ID_KEY, String(nextId)); } catch(e) {}
-}
-function loadFromStorage() {
-  try {
-    const s = localStorage.getItem(STORAGE_KEY);
-    if (s) { events = JSON.parse(s); const nid = localStorage.getItem(STORAGE_ID_KEY); if (nid) nextId = parseInt(nid); return true; }
-  } catch(e) {}
-  return false;
-}
-
-let events = JSON.parse(JSON.stringify(INITIAL_EVENTS));
-let nextId = 100;
-if (!loadFromStorage()) { events = JSON.parse(JSON.stringify(INITIAL_EVENTS)); }
-
-let filter="all",selectedId=null,deleteId=null,dragState=null;
+let events=JSON.parse(JSON.stringify(INITIAL_EVENTS));
+let nextId=100,filter="all",selectedId=null,deleteId=null,dragState=null;
 
 const START=new Date("2026-05-01"),END=new Date("2027-02-01");
 const TOTAL_DAYS=Math.ceil((END-START)/86400000);
-const TOTAL_WIDTH=2400,ROW_HEIGHT=52,CARD_MIN_SPACING=148;
+const TOTAL_WIDTH=2400,ROW_HEIGHT=52,CARD_MIN_SPACING=148,MAX_ROWS=20;
 const MONTH_NAMES=["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
 
 function daysBetween(a,b){return Math.ceil((b-a)/86400000)}
@@ -204,29 +205,67 @@ function posToDate(x){const d=Math.round((x/TOTAL_WIDTH)*TOTAL_DAYS);const r=new
 function formatDate(s){const d=new Date(s+"T00:00:00");return`${d.getMonth()+1}/${d.getDate()}`}
 function getMonths(){const m=[];let c=new Date(START);while(c<END){m.push(new Date(c));c=new Date(c.getFullYear(),c.getMonth()+1,1)}return m}
 function getFiltered(){return events.filter(ev=>{if(filter==="all")return true;if(ev.type==="launch")return true;return ev.type===filter}).sort((a,b)=>a.date.localeCompare(b.date))}
-function assignRows(evts){const r=[];return evts.map(ev=>{const p=dateToPos(ev.date);let row=0;while(r[row]!==undefined&&p-r[row]<CARD_MIN_SPACING)row++;r[row]=p;return{...ev,row}})}
+function assignRows(evts){const r=[];return evts.map(ev=>{if(typeof ev.customRow==='number')return{...ev,row:ev.customRow};const p=dateToPos(ev.date);let row=0;while(r[row]!==undefined&&p-r[row]<CARD_MIN_SPACING)row++;r[row]=p;return{...ev,row}})}
+
+// === FIREBASE SYNC ===
+function setSyncStatus(ok,msg){document.getElementById('syncStatus').innerHTML=`<span class="sync-dot ${ok?'sync-ok':'sync-loading'}"></span>${msg}`}
+
+async function firebaseSave(){
+  if(!IS_ADMIN)return;
+  setSyncStatus(false,'保存中...');
+  try{
+    await fetch(DB_URL+'/timeline.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({events,nextId})});
+    setSyncStatus(true,'已同步');
+  }catch(e){setSyncStatus(false,'同步失败')}
+}
+
+async function firebaseLoad(){
+  setSyncStatus(false,'加载中...');
+  try{
+    const r=await fetch(DB_URL+'/timeline.json');
+    const data=await r.json();
+    if(data&&data.events){events=data.events;if(data.nextId)nextId=data.nextId;setSyncStatus(true,'已同步');return true}
+  }catch(e){setSyncStatus(false,'连接失败')}
+  return false;
+}
+
+// === INIT ===
+async function init(){
+  const loaded=await firebaseLoad();
+  if(!loaded){
+    // First time: admin pushes initial data; viewer shows defaults
+    events=JSON.parse(JSON.stringify(INITIAL_EVENTS));
+    if(IS_ADMIN)await firebaseSave();
+  }
+  buildFilterBar();buildLegend();render();
+  setTimeout(()=>{document.getElementById('timelineScroll').scrollLeft=Math.max(0,dateToPos(new Date().toISOString().slice(0,10))-200)},100);
+  // Polling
+  setInterval(async()=>{if(!dragState){await firebaseLoad();render()}},POLL_INTERVAL);
+}
 
 function showPanel(name){['editPanel','addPanel','deletePanel'].forEach(id=>document.getElementById(id).classList.remove('visible'));if(name)document.getElementById(name+'Panel').classList.add('visible')}
 
 function buildFilterBar(){
   const bar=document.getElementById('filterBar');let h='';
   FILTERS.forEach(f=>{const c=f.key==='all'?'#94a3b8':TYPES[f.key].color;h+=`<button class="filter-btn${filter===f.key?' active':''}" data-filter="${f.key}"><span class="filter-dot" style="background:${c}"></span>${f.label}</button>`});
-  h+=`<button class="btn-add" id="addBtn">+ 添加</button>`;
-  h+=`<button class="filter-btn" id="resetBtn" style="margin-left:2px">重置</button>`;
+  if(IS_ADMIN){
+    h+=`<button class="btn-add" id="addBtn">+ 添加</button>`;
+    h+=`<button class="filter-btn" id="resetBtn" style="margin-left:2px">重置</button>`;
+  }
   bar.innerHTML=h;
   bar.querySelectorAll('.filter-btn[data-filter]').forEach(b=>{b.addEventListener('click',()=>{filter=b.dataset.filter;buildFilterBar();render()})});
-  document.getElementById('resetBtn').addEventListener('click',()=>{
-    if(!confirm('重置将恢复所有事件到初始状态，确定吗？'))return;
-    events=JSON.parse(JSON.stringify(INITIAL_EVENTS));nextId=100;selectedId=null;deleteId=null;showPanel(null);saveToStorage();render();
-  });
-  document.getElementById('addBtn').addEventListener('click',()=>{showPanel('add');document.getElementById('addDate').value='';document.getElementById('addLabel').value='';document.getElementById('addType').value='dev';document.getElementById('addFixed').checked=false;document.getElementById('addImportant').checked=false;document.getElementById('addNote').value=''});
+  if(IS_ADMIN){
+    document.getElementById('resetBtn').addEventListener('click',async()=>{if(!confirm('重置将恢复所有事件到初始状态，确定吗？'))return;events=JSON.parse(JSON.stringify(INITIAL_EVENTS));nextId=100;selectedId=null;deleteId=null;showPanel(null);await firebaseSave();render()});
+    document.getElementById('addBtn').addEventListener('click',()=>{showPanel('add');document.getElementById('addDate').value='';document.getElementById('addLabel').value='';document.getElementById('addType').value='dev';document.getElementById('addFixed').checked=false;document.getElementById('addImportant').checked=false;document.getElementById('addNote').value=''});
+  }
 }
 
 function buildLegend(){
   const bar=document.getElementById('legendBar');let h='';
   Object.entries(TYPES).forEach(([k,t])=>{h+=`<span class="legend-item"><span class="legend-dot" style="background:${t.color}"></span> ${t.label}</span>`});
   h+=`<span class="legend-item"><span class="legend-lock"></span> 锁定</span>`;
-  h+=`<span class="save-note">改动自动保存至浏览器</span>`;
+  if(IS_ADMIN)h+=`<span class="save-note">改动自动同步至云端</span>`;
+  else h+=`<span class="save-note">每15秒自动刷新</span>`;
   bar.innerHTML=h;
 }
 
@@ -234,7 +273,7 @@ function render(){
   const canvas=document.getElementById("timelineCanvas"),listC=document.getElementById("eventListContainer");
   const months=getMonths(),filtered=getFiltered(),positioned=assignRows(filtered);
   const maxRow=positioned.reduce((m,e)=>Math.max(m,e.row),0);
-  const th=Math.max(520,(maxRow+1)*ROW_HEIGHT+100);
+  const th=Math.max(520,(maxRow+1)*ROW_HEIGHT+120);
   canvas.style.width=TOTAL_WIDTH+"px";canvas.style.minHeight=th+"px";
 
   let html='<div class="month-bar">';const today=new Date();
@@ -243,14 +282,16 @@ function render(){
   months.forEach(m=>{const l=(daysBetween(START,m)/TOTAL_DAYS)*TOTAL_WIDTH;html+=`<div class="grid-line" style="left:${l}px;bottom:0"></div>`});
   const ts=today.toISOString().slice(0,10),tp=dateToPos(ts);
   if(tp>0&&tp<TOTAL_WIDTH){html+=`<div class="today-line" style="left:${tp}px"></div><div class="today-label" style="left:${tp-20}px">今天</div>`}
+  if(IS_ADMIN){for(let i=0;i<=MAX_ROWS;i++){html+=`<div class="row-guide" id="rowGuide${i}" style="top:${60+i*ROW_HEIGHT}px"></div>`}}
 
   html+='<div style="position:relative;padding-top:60px">';
   positioned.forEach(ev=>{
     const pos=dateToPos(ev.date),t=TYPES[ev.type];
-    const cls=['event-node',!ev.fixed?'draggable':'',selectedId===ev.id?'selected':''].filter(Boolean).join(' ');
+    const canDrag=IS_ADMIN;
+    const cls=['event-node',canDrag?'draggable':'',selectedId===ev.id?'selected':''].filter(Boolean).join(' ');
     const ds=`border-color:${t.color};${ev.important?`background:${t.color};box-shadow:0 0 8px ${t.color}50;`:'background:transparent;'}`;
     const cbs=ev.fixed?'dashed':'solid';const cbc=selectedId===ev.id?'#f59e0b':`${t.color}40`;
-    html+=`<div class="${cls}" data-id="${ev.id}" style="left:${pos-4}px;top:${ev.row*ROW_HEIGHT}px">`;
+    html+=`<div class="${cls}" data-id="${ev.id}" data-fixed="${ev.fixed?1:0}" style="left:${pos-4}px;top:${ev.row*ROW_HEIGHT}px">`;
     html+=`<div class="event-stem" style="background:${t.color}"></div><div class="event-dot" style="${ds}"></div>`;
     html+=`<div class="event-card" style="background:${t.bg};border:1px ${cbs} ${cbc}">`;
     html+=`<div class="date-label">${formatDate(ev.date)}<span class="type-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>${ev.fixed?'<span class="lock-icon">🔒</span>':''}</div>`;
@@ -260,57 +301,63 @@ function render(){
   });
   html+='</div>';canvas.innerHTML=html;
 
+  // List
   let lh='';
   filtered.forEach(ev=>{
     const t=TYPES[ev.type],isSel=selectedId===ev.id;
     lh+=`<div class="list-row${isSel?' selected-row':''}" data-id="${ev.id}">`;
     lh+=`<span class="list-dot" style="background:${t.color}"></span>`;
     lh+=`<span class="list-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>`;
-    lh+=`<span class="list-date ${ev.fixed?'locked':'editable'}" data-id="${ev.id}">${formatDate(ev.date)}</span>`;
+    const dateClass=IS_ADMIN&&!ev.fixed?'editable':'locked';
+    lh+=`<span class="list-date ${dateClass}" data-id="${ev.id}">${formatDate(ev.date)}</span>`;
     lh+=`<span class="list-label${ev.important?' important':''}">${ev.label}</span>`;
     if(ev.fixed)lh+=`<span style="font-size:9px;color:#f59e0b">🔒</span>`;
     if(ev.note)lh+=`<span class="list-note">(${ev.note})</span>`;
-    lh+=`<button class="btn-del" data-del-id="${ev.id}" title="删除">×</button>`;
+    if(IS_ADMIN)lh+=`<button class="btn-del" data-del-id="${ev.id}" title="删除">×</button>`;
     lh+=`</div>`;
   });
   listC.innerHTML=lh;
 
-  document.querySelectorAll('.event-node.draggable').forEach(el=>{el.addEventListener('mousedown',onDragStart);el.addEventListener('touchstart',onTouchStart,{passive:false})});
-  document.querySelectorAll('.list-date.editable').forEach(el=>{el.addEventListener('click',()=>openEdit(parseInt(el.dataset.id)))});
-  document.querySelectorAll('.event-node.draggable .event-card').forEach(el=>{el.addEventListener('click',()=>{if(dragState&&dragState.moved)return;openEdit(parseInt(el.closest('.event-node').dataset.id))})});
-  document.querySelectorAll('.btn-del').forEach(el=>{el.addEventListener('click',(e)=>{e.stopPropagation();openDelete(parseInt(el.dataset.delId))})});
+  // Bind (admin only for editing)
+  if(IS_ADMIN){
+    document.querySelectorAll('.event-node.draggable').forEach(el=>{el.addEventListener('mousedown',onDragStart);el.addEventListener('touchstart',onTouchStart,{passive:false})});
+    document.querySelectorAll('.list-date.editable').forEach(el=>{el.addEventListener('click',()=>openEdit(parseInt(el.dataset.id)))});
+    document.querySelectorAll('.event-node.draggable .event-card').forEach(el=>{el.addEventListener('click',()=>{if(dragState&&dragState.moved)return;const id=parseInt(el.closest('.event-node').dataset.id);const ev=events.find(e=>e.id===id);if(!ev.fixed)openEdit(id)})});
+    document.querySelectorAll('.btn-del').forEach(el=>{el.addEventListener('click',(e)=>{e.stopPropagation();openDelete(parseInt(el.dataset.delId))})});
+  }
 }
 
-function openEdit(id){const ev=events.find(e=>e.id===id);if(!ev||ev.fixed)return;selectedId=id;deleteId=null;showPanel('edit');document.getElementById('editLabel').textContent=ev.label;document.getElementById('editDateInput').value=ev.date;render()}
-function openDelete(id){const ev=events.find(e=>e.id===id);if(!ev)return;deleteId=id;selectedId=null;showPanel('delete');document.getElementById('deleteLabel').textContent=`${formatDate(ev.date)} — ${ev.label}`;render()}
+function openEdit(id){if(!IS_ADMIN)return;const ev=events.find(e=>e.id===id);if(!ev||ev.fixed)return;selectedId=id;deleteId=null;showPanel('edit');document.getElementById('editLabel').textContent=ev.label;document.getElementById('editDateInput').value=ev.date;render()}
+function openDelete(id){if(!IS_ADMIN)return;const ev=events.find(e=>e.id===id);if(!ev)return;deleteId=id;selectedId=null;showPanel('delete');document.getElementById('deleteLabel').textContent=`${formatDate(ev.date)} — ${ev.label}`;render()}
 function closeAll(){selectedId=null;deleteId=null;showPanel(null);render()}
 
-function onDragStart(e){const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);if(ev.fixed)return;e.preventDefault();dragState={id,startX:e.clientX,startPos:dateToPos(ev.date),moved:false};el.classList.add('dragging');document.addEventListener('mousemove',onDragMove);document.addEventListener('mouseup',onDragEnd)}
-function onDragMove(e){if(!dragState)return;const dx=e.clientX-dragState.startX;if(Math.abs(dx)>3)dragState.moved=true;const np=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));const nd=posToDate(np);const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(el){el.style.left=(np-4)+'px';el.style.transition='none';const dl=el.querySelector('.date-label');if(dl){const ev=events.find(e=>e.id===dragState.id),t=TYPES[ev.type];dl.innerHTML=`${formatDate(nd)}<span class="type-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>`}}events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev)}
-function onDragEnd(){if(dragState){const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(el)el.classList.remove('dragging')}document.removeEventListener('mousemove',onDragMove);document.removeEventListener('mouseup',onDragEnd);const wm=dragState?.moved;dragState=null;if(wm){saveToStorage();render()}}
-function onTouchStart(e){const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);if(ev.fixed)return;const t=e.touches[0];dragState={id,startX:t.clientX,startPos:dateToPos(ev.date),moved:false};el.classList.add('dragging');document.addEventListener('touchmove',onTouchMove,{passive:false});document.addEventListener('touchend',onTouchEnd)}
-function onTouchMove(e){if(!dragState)return;e.preventDefault();const t=e.touches[0],dx=t.clientX-dragState.startX;if(Math.abs(dx)>3)dragState.moved=true;const np=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));const nd=posToDate(np);const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(el){el.style.left=(np-4)+'px';el.style.transition='none'}events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev)}
-function onTouchEnd(){document.removeEventListener('touchmove',onTouchMove);document.removeEventListener('touchend',onTouchEnd);dragState=null;saveToStorage();render()}
+function showRowGuides(show){for(let i=0;i<=MAX_ROWS;i++){const g=document.getElementById('rowGuide'+i);if(g)g.style.display=show?'block':'none'}}
 
-document.getElementById('editConfirm').addEventListener('click',()=>{const nd=document.getElementById('editDateInput').value;if(nd&&selectedId){events=events.map(ev=>ev.id===selectedId?{...ev,date:nd}:ev);saveToStorage();closeAll()}});
+// === DRAG ===
+function onDragStart(e){if(!IS_ADMIN)return;const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);e.preventDefault();const isFixed=ev.fixed;const currentRow=typeof ev.customRow==='number'?ev.customRow:assignRows(getFiltered()).find(x=>x.id===id)?.row||0;dragState={id,startX:e.clientX,startY:e.clientY,startPos:dateToPos(ev.date),startRow:currentRow,moved:false,isFixed};el.classList.add('dragging');showRowGuides(true);document.addEventListener('mousemove',onDragMove);document.addEventListener('mouseup',onDragEnd)}
+function onDragMove(e){if(!dragState)return;const dx=e.clientX-dragState.startX,dy=e.clientY-dragState.startY;if(Math.abs(dx)>3||Math.abs(dy)>3)dragState.moved=true;const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(!el)return;let newPos=dragState.startPos;if(!dragState.isFixed){newPos=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));const nd=posToDate(newPos);events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev);const dl=el.querySelector('.date-label');if(dl){const ev=events.find(e=>e.id===dragState.id),t=TYPES[ev.type];dl.innerHTML=`${formatDate(nd)}<span class="type-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>${ev.fixed?'<span class="lock-icon">🔒</span>':''}`}}const newRow=Math.max(0,Math.round(dragState.startRow+dy/ROW_HEIGHT));events=events.map(ev=>ev.id===dragState.id?{...ev,customRow:newRow}:ev);el.style.left=((!dragState.isFixed?newPos:dateToPos(events.find(e=>e.id===dragState.id).date))-4)+'px';el.style.top=(newRow*ROW_HEIGHT)+'px';el.style.transition='none'}
+function onDragEnd(){showRowGuides(false);if(dragState){const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(el)el.classList.remove('dragging')}document.removeEventListener('mousemove',onDragMove);document.removeEventListener('mouseup',onDragEnd);const wm=dragState?.moved;dragState=null;if(wm){firebaseSave();render()}}
+function onTouchStart(e){if(!IS_ADMIN)return;const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);const t=e.touches[0];const isFixed=ev.fixed;const currentRow=typeof ev.customRow==='number'?ev.customRow:assignRows(getFiltered()).find(x=>x.id===id)?.row||0;dragState={id,startX:t.clientX,startY:t.clientY,startPos:dateToPos(ev.date),startRow:currentRow,moved:false,isFixed};el.classList.add('dragging');showRowGuides(true);document.addEventListener('touchmove',onTouchMove,{passive:false});document.addEventListener('touchend',onTouchEnd)}
+function onTouchMove(e){if(!dragState)return;e.preventDefault();const t=e.touches[0],dx=t.clientX-dragState.startX,dy=t.clientY-dragState.startY;if(Math.abs(dx)>3||Math.abs(dy)>3)dragState.moved=true;const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(!el)return;let newPos=dragState.startPos;if(!dragState.isFixed){newPos=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));const nd=posToDate(newPos);events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev)}const newRow=Math.max(0,Math.round(dragState.startRow+dy/ROW_HEIGHT));events=events.map(ev=>ev.id===dragState.id?{...ev,customRow:newRow}:ev);el.style.left=((!dragState.isFixed?newPos:dateToPos(events.find(e=>e.id===dragState.id).date))-4)+'px';el.style.top=(newRow*ROW_HEIGHT)+'px';el.style.transition='none'}
+function onTouchEnd(){showRowGuides(false);document.removeEventListener('touchmove',onTouchMove);document.removeEventListener('touchend',onTouchEnd);dragState=null;firebaseSave();render()}
+
+// === PANEL ACTIONS ===
+document.getElementById('editConfirm').addEventListener('click',async()=>{const nd=document.getElementById('editDateInput').value;if(nd&&selectedId){events=events.map(ev=>ev.id===selectedId?{...ev,date:nd}:ev);await firebaseSave();closeAll()}});
 document.getElementById('editCancel').addEventListener('click',closeAll);
-
-document.getElementById('addConfirm').addEventListener('click',()=>{
+document.getElementById('addConfirm').addEventListener('click',async()=>{
   const date=document.getElementById('addDate').value,label=document.getElementById('addLabel').value.trim();
   const type=document.getElementById('addType').value,fixed=document.getElementById('addFixed').checked;
   const important=document.getElementById('addImportant').checked,note=document.getElementById('addNote').value.trim();
   if(!date||!label){alert('请填写日期和名称');return}
-  const ev={id:nextId++,date,label,type,fixed};
-  if(important)ev.important=true;if(note)ev.note=note;
-  events.push(ev);saveToStorage();showPanel(null);render();
+  const ev={id:nextId++,date,label,type,fixed};if(important)ev.important=true;if(note)ev.note=note;
+  events.push(ev);await firebaseSave();showPanel(null);render();
 });
 document.getElementById('addCancel').addEventListener('click',()=>{showPanel(null)});
-
-document.getElementById('deleteConfirm').addEventListener('click',()=>{if(deleteId){events=events.filter(ev=>ev.id!==deleteId);saveToStorage();closeAll()}});
+document.getElementById('deleteConfirm').addEventListener('click',async()=>{if(deleteId){events=events.filter(ev=>ev.id!==deleteId);await firebaseSave();closeAll()}});
 document.getElementById('deleteCancel').addEventListener('click',closeAll);
 
-buildFilterBar();buildLegend();render();
-setTimeout(()=>{const s=document.getElementById('timelineScroll');s.scrollLeft=Math.max(0,dateToPos(new Date().toISOString().slice(0,10))-200)},100);
+// === START ===
+init();
 </script>
 </body>
 </html>
