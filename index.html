@@ -6,358 +6,76 @@
 <title>无休夏日综合征 · 制作时间线</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0e17;color:#e2e8f0;font-family:'Noto Sans SC',system-ui,sans-serif;overflow-x:hidden}
+  .header{padding:24px 28px 16px;border-bottom:1px solid #1e293b}
+  .header-top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+  .header h1{font-size:20px;font-weight:700;letter-spacing:-0.5px;color:#f8fafc}
+  .header .subtitle{font-size:12px;color:#64748b;margin-top:4px}
+  .controls{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+  .filter-btn{padding:4px 10px;font-size:11px;font-weight:500;background:transparent;color:#64748b;border:1px solid #1e293b;border-radius:5px;cursor:pointer;font-family:inherit;transition:all 0.2s;display:flex;align-items:center;gap:4px}
+  .filter-btn.active{background:#1e293b;color:#f8fafc;border-color:#334155}
+  .filter-btn:hover{border-color:#334155}
+  .filter-dot{width:6px;height:6px;border-radius:50%}
+  .btn-add{padding:4px 10px;font-size:11px;font-weight:600;background:#22c55e20;color:#22c55e;border:1px solid #22c55e40;border-radius:5px;cursor:pointer;font-family:inherit;transition:all 0.2s;margin-left:4px}
+  .btn-add:hover{background:#22c55e30;border-color:#22c55e60}
+  .legend{display:flex;gap:14px;margin-top:12px;font-size:11px;color:#94a3b8;flex-wrap:wrap;align-items:center}
+  .legend-item{display:flex;align-items:center;gap:4px}
+  .legend-dot{width:7px;height:7px;border-radius:50%}
+  .legend-lock{width:9px;height:9px;border-radius:2px;border:1.5px dashed #f59e0b}
+  .save-note{font-size:10px;color:#334155;margin-left:auto}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  .action-panel{padding:12px 28px;background:#111827;border-bottom:1px solid #1e293b;display:none;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap}
+  .action-panel.visible{display:flex}
+  .action-panel input[type="date"],.action-panel input[type="text"]{background:#1e293b;border:1px solid #334155;color:#f8fafc;padding:4px 8px;border-radius:4px;font-size:13px;font-family:inherit}
+  .action-panel input[type="text"]{min-width:180px}
+  .action-panel select{background:#1e293b;border:1px solid #334155;color:#f8fafc;padding:4px 8px;border-radius:4px;font-size:13px;font-family:inherit}
+  .action-panel label{color:#94a3b8;font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer}
+  .action-panel input[type="checkbox"]{accent-color:#3b82f6}
+  .btn-confirm{padding:4px 14px;background:#3b82f6;color:#fff;border:none;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
+  .btn-cancel{padding:4px 14px;background:transparent;color:#94a3b8;border:1px solid #334155;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
+  .btn-delete-confirm{padding:4px 14px;background:#ef444420;color:#ef4444;border:1px solid #ef444440;border-radius:4px;font-size:12px;cursor:pointer;font-family:inherit}
+  .btn-delete-confirm:hover{background:#ef444440}
 
-  body {
-    background: #0a0e17;
-    color: #e2e8f0;
-    font-family: 'Noto Sans SC', system-ui, sans-serif;
-    overflow-x: hidden;
-  }
+  .timeline-scroll{overflow-x:auto;overflow-y:auto;position:relative}
+  .timeline-canvas{position:relative;padding:0 0 40px}
+  .month-bar{position:sticky;top:0;z-index:20;background:#0a0e17;border-bottom:1px solid #1e293b;height:40px}
+  .month-label{position:absolute;padding:10px 12px;font-size:13px;font-weight:600;color:#64748b;border-right:1px solid #1e293b;height:40px}
+  .month-label.current{color:#f8fafc;background:rgba(59,130,246,0.06)}
+  .grid-line{position:absolute;top:40px;bottom:0;width:1px;background:#1e293b}
+  .today-line{position:absolute;top:36px;bottom:0;width:2px;background:linear-gradient(180deg,#f59e0b 0%,rgba(245,158,11,0.1) 100%);z-index:15}
+  .today-label{position:absolute;top:40px;z-index:16;background:#f59e0b;color:#000;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap}
 
-  .header {
-    padding: 24px 28px 16px;
-    border-bottom: 1px solid #1e293b;
-  }
+  .event-node{position:absolute;z-index:10;user-select:none;transition:left 0.3s ease}
+  .event-node.dragging{z-index:30;transition:none}
+  .event-node.draggable{cursor:grab}
+  .event-node.draggable:active{cursor:grabbing}
+  .event-stem{position:absolute;left:3px;top:-4px;width:2px;height:12px;opacity:0.4}
+  .event-dot{width:8px;height:8px;border-radius:50%;border-width:2px;border-style:solid}
+  .event-card{position:absolute;top:14px;left:-6px;border-radius:6px;padding:5px 9px;min-width:125px;max-width:175px;transition:box-shadow 0.2s}
+  .event-node.dragging .event-card{box-shadow:0 4px 20px rgba(0,0,0,0.4)}
+  .event-card .date-label{font-size:10px;color:#94a3b8;margin-bottom:1px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:4px}
+  .event-card .type-badge{font-size:9px;padding:0 4px;border-radius:3px;font-weight:600;letter-spacing:0.3px}
+  .event-card .event-title{font-size:11px;font-weight:500;line-height:1.35;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .event-card .event-title.important{font-weight:700;color:#f8fafc;white-space:normal}
+  .event-card .event-note{font-size:9px;color:#94a3b8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lock-icon{color:#f59e0b;font-size:9px}
 
-  .header-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .header h1 {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    color: #f8fafc;
-  }
-
-  .header .subtitle {
-    font-size: 12px;
-    color: #64748b;
-    margin-top: 4px;
-  }
-
-  .controls {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .filter-btn {
-    padding: 5px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    background: transparent;
-    color: #64748b;
-    border: 1px solid #1e293b;
-    border-radius: 6px;
-    cursor: pointer;
-    font-family: inherit;
-    transition: all 0.2s;
-  }
-
-  .filter-btn.active {
-    background: #1e293b;
-    color: #f8fafc;
-    border-color: #334155;
-  }
-
-  .filter-btn:hover { border-color: #334155; }
-
-  .legend {
-    display: flex;
-    gap: 16px;
-    margin-top: 12px;
-    font-size: 11px;
-    color: #94a3b8;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-
-  .legend-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-  }
-
-  .legend-lock {
-    width: 10px;
-    height: 10px;
-    border-radius: 2px;
-    border: 1.5px dashed #f59e0b;
-  }
-
-  /* Edit panel */
-  .edit-panel {
-    padding: 12px 28px;
-    background: #111827;
-    border-bottom: 1px solid #1e293b;
-    display: none;
-    align-items: center;
-    gap: 12px;
-    font-size: 13px;
-    flex-wrap: wrap;
-  }
-
-  .edit-panel.visible { display: flex; }
-
-  .edit-panel input[type="date"] {
-    background: #1e293b;
-    border: 1px solid #334155;
-    color: #f8fafc;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 13px;
-    font-family: inherit;
-  }
-
-  .edit-panel .btn-confirm {
-    padding: 4px 14px;
-    background: #3b82f6;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    font-size: 12px;
-    cursor: pointer;
-    font-family: inherit;
-  }
-
-  .edit-panel .btn-cancel {
-    padding: 4px 14px;
-    background: transparent;
-    color: #94a3b8;
-    border: 1px solid #334155;
-    border-radius: 4px;
-    font-size: 12px;
-    cursor: pointer;
-    font-family: inherit;
-  }
-
-  /* Timeline container */
-  .timeline-scroll {
-    overflow-x: auto;
-    overflow-y: auto;
-    position: relative;
-  }
-
-  .timeline-canvas {
-    position: relative;
-    padding: 0 0 40px;
-  }
-
-  /* Month headers */
-  .month-bar {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    background: #0a0e17;
-    border-bottom: 1px solid #1e293b;
-    height: 40px;
-  }
-
-  .month-label {
-    position: absolute;
-    padding: 10px 12px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #64748b;
-    border-right: 1px solid #1e293b;
-    height: 40px;
-  }
-
-  .month-label.current { color: #f8fafc; background: rgba(59,130,246,0.06); }
-
-  /* Grid lines */
-  .grid-line {
-    position: absolute;
-    top: 40px;
-    bottom: 0;
-    width: 1px;
-    background: #1e293b;
-  }
-
-  /* Today line */
-  .today-line {
-    position: absolute;
-    top: 36px;
-    bottom: 0;
-    width: 2px;
-    background: linear-gradient(180deg, #f59e0b 0%, rgba(245,158,11,0.1) 100%);
-    z-index: 15;
-  }
-
-  .today-label {
-    position: absolute;
-    top: 40px;
-    z-index: 16;
-    background: #f59e0b;
-    color: #000;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 3px;
-    white-space: nowrap;
-  }
-
-  /* Event nodes */
-  .event-node {
-    position: absolute;
-    z-index: 10;
-    user-select: none;
-    transition: left 0.3s ease;
-  }
-
-  .event-node.dragging {
-    z-index: 30;
-    transition: none;
-  }
-
-  .event-node.draggable { cursor: grab; }
-  .event-node.draggable:active { cursor: grabbing; }
-
-  .event-stem {
-    position: absolute;
-    left: 3px;
-    top: -4px;
-    width: 2px;
-    height: 12px;
-    opacity: 0.4;
-  }
-
-  .event-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    border-width: 2px;
-    border-style: solid;
-  }
-
-  .event-card {
-    position: absolute;
-    top: 14px;
-    left: -6px;
-    border-radius: 6px;
-    padding: 6px 10px;
-    min-width: 130px;
-    max-width: 180px;
-    transition: box-shadow 0.2s, border-color 0.2s;
-  }
-
-  .event-node.dragging .event-card {
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-  }
-
-  .event-card .date-label {
-    font-size: 10px;
-    color: #64748b;
-    margin-bottom: 2px;
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  .event-card .event-title {
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 1.4;
-  }
-
-  .event-card .event-title.important { font-weight: 700; color: #f8fafc !important; }
-
-  .event-card .event-note {
-    font-size: 10px;
-    color: #475569;
-    margin-top: 2px;
-  }
-
-  .lock-icon { margin-left: 4px; color: #f59e0b; font-size: 9px; }
-
-  /* Colors */
-  .type-dev .event-stem { background: #3b82f6; }
-  .type-dev .event-dot { border-color: #3b82f6; }
-  .type-dev .event-card { background: #1a2744; border: 1px solid rgba(59,130,246,0.25); }
-  .type-dev .event-title { color: #93c5fd; }
-  .type-dev.important-true .event-dot { background: #3b82f6; box-shadow: 0 0 8px rgba(59,130,246,0.3); }
-
-  .type-marketing .event-stem { background: #a855f7; }
-  .type-marketing .event-dot { border-color: #a855f7; }
-  .type-marketing .event-card { background: #2a1f35; border: 1px solid rgba(168,85,247,0.25); }
-  .type-marketing .event-title { color: #d8b4fe; }
-  .type-marketing.important-true .event-dot { background: #a855f7; box-shadow: 0 0 8px rgba(168,85,247,0.3); }
-
-  .type-launch .event-stem { background: #ef4444; }
-  .type-launch .event-dot { border-color: #ef4444; }
-  .type-launch .event-card { background: #3b1c1c; border: 1px solid rgba(239,68,68,0.25); }
-  .type-launch .event-title { color: #fca5a5; }
-  .type-launch.important-true .event-dot { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.3); }
-
-  .fixed-true .event-card { border-style: dashed; }
-  .selected .event-card { border-color: #f59e0b !important; }
-
-  /* Event list */
-  .event-list {
-    padding: 20px 28px;
-    border-top: 1px solid #1e293b;
-  }
-
-  .event-list h2 {
-    font-size: 14px;
-    font-weight: 600;
-    color: #94a3b8;
-    margin-bottom: 12px;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-  }
-
-  .list-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-    border-radius: 4px;
-    font-size: 13px;
-    transition: background 0.15s;
-  }
-
-  .list-row:hover { background: rgba(30,41,59,0.5); }
-  .list-row.selected-row { background: #1e293b; }
-
-  .list-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .list-date {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    min-width: 50px;
-  }
-
-  .list-date.editable {
-    color: #94a3b8;
-    cursor: pointer;
-    text-decoration: underline;
-    text-decoration-color: #334155;
-    text-underline-offset: 2px;
-  }
-
-  .list-date.locked { color: #475569; }
-
-  .list-label { color: #cbd5e1; }
-  .list-label.important { color: #f8fafc; font-weight: 600; }
-  .list-note { font-size: 11px; color: #475569; }
+  .event-list{padding:20px 28px;border-top:1px solid #1e293b}
+  .event-list h2{font-size:14px;font-weight:600;color:#94a3b8;margin-bottom:12px;letter-spacing:0.5px;text-transform:uppercase}
+  .list-row{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:4px;font-size:13px;transition:background 0.15s}
+  .list-row:hover{background:rgba(30,41,59,0.5)}
+  .list-row.selected-row{background:#1e293b}
+  .list-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .list-badge{font-size:10px;padding:1px 5px;border-radius:3px;font-weight:600;flex-shrink:0;min-width:28px;text-align:center}
+  .list-date{font-family:'JetBrains Mono',monospace;font-size:12px;min-width:44px}
+  .list-date.editable{color:#e2e8f0;cursor:pointer;text-decoration:underline;text-decoration-color:#334155;text-underline-offset:2px}
+  .list-date.locked{color:#94a3b8}
+  .list-label{color:#e2e8f0;flex:1}
+  .list-label.important{color:#f8fafc;font-weight:600}
+  .list-note{font-size:11px;color:#94a3b8}
+  .btn-del{width:20px;height:20px;border-radius:4px;border:none;background:transparent;color:#475569;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0;font-family:inherit;line-height:1}
+  .btn-del:hover{background:#ef444420;color:#ef4444}
 </style>
 </head>
 <body>
@@ -368,28 +86,36 @@
       <h1>无休夏日综合征 · 制作时间线</h1>
       <div class="subtitle">Endless Summer Syndrome — Development & Marketing Timeline</div>
     </div>
-    <div class="controls">
-      <button class="filter-btn active" data-filter="all">全部</button>
-      <button class="filter-btn" data-filter="dev">开发</button>
-      <button class="filter-btn" data-filter="marketing">宣发</button>
-      <button class="filter-btn" id="resetBtn">重置</button>
-    </div>
+    <div class="controls" id="filterBar"></div>
   </div>
-  <div class="legend">
-    <span class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span> 开发</span>
-    <span class="legend-item"><span class="legend-dot" style="background:#a855f7"></span> 宣发</span>
-    <span class="legend-item"><span class="legend-dot" style="background:#ef4444"></span> 发售</span>
-    <span class="legend-item"><span class="legend-lock"></span> 锁定</span>
-    <span style="color:#475569">拖拽非锁定事件可调整日期 · 点击列表日期可精确编辑</span>
-  </div>
+  <div class="legend" id="legendBar"></div>
 </div>
 
-<div class="edit-panel" id="editPanel">
-  <span style="color:#94a3b8">编辑日期：</span>
+<div class="action-panel" id="editPanel">
+  <span style="color:#94a3b8">编辑：</span>
   <span id="editLabel" style="color:#f8fafc;font-weight:600"></span>
   <input type="date" id="editDateInput">
   <button class="btn-confirm" id="editConfirm">确认</button>
   <button class="btn-cancel" id="editCancel">取消</button>
+</div>
+
+<div class="action-panel" id="addPanel">
+  <span style="color:#22c55e;font-weight:600">+ 新事件</span>
+  <input type="date" id="addDate">
+  <input type="text" id="addLabel" placeholder="事件名称">
+  <select id="addType"><option value="dev">综合</option><option value="script">剧本</option><option value="art">美术</option><option value="music">音乐</option><option value="voice">配音</option><option value="marketing">宣发</option></select>
+  <label><input type="checkbox" id="addFixed"> 锁定</label>
+  <label><input type="checkbox" id="addImportant"> 重要</label>
+  <input type="text" id="addNote" placeholder="备注（可选）" style="min-width:120px">
+  <button class="btn-confirm" id="addConfirm">添加</button>
+  <button class="btn-cancel" id="addCancel">取消</button>
+</div>
+
+<div class="action-panel" id="deletePanel">
+  <span style="color:#ef4444;font-weight:600">确认删除：</span>
+  <span id="deleteLabel" style="color:#f8fafc"></span>
+  <button class="btn-delete-confirm" id="deleteConfirm">删除</button>
+  <button class="btn-cancel" id="deleteCancel">取消</button>
 </div>
 
 <div class="timeline-scroll" id="timelineScroll">
@@ -397,350 +123,194 @@
 </div>
 
 <div class="event-list">
-  <h2>事件列表 · 点击日期可编辑</h2>
+  <h2>事件列表 · 点击日期可编辑 · 点击 × 可删除</h2>
   <div id="eventListContainer"></div>
 </div>
 
 <script>
-const INITIAL_EVENTS = [
-  { id: 1, date: "2026-05-16", label: "商店页Coming Soon上线", type: "marketing", fixed: true },
-  { id: 2, date: "2026-05-31", label: "编辑确定并开始工作", type: "dev", fixed: false },
-  { id: 3, date: "2026-05-18", label: "杂谈第一批开始发布", type: "marketing", fixed: false, note: "每周一篇，共3-5篇" },
-  { id: 4, date: "2026-06-07", label: "Demo完成（除配音外）", type: "dev", fixed: false, important: true },
-  { id: 5, date: "2026-06-15", label: "观察六月Next Fest", type: "marketing", fixed: true, note: "6/15-6/22" },
-  { id: 6, date: "2026-07-01", label: "宣发美工第一批素材交付", type: "marketing", fixed: false, note: "capsule排版/社媒模板" },
-  { id: 7, date: "2026-07-15", label: "全本剧本定稿", type: "dev", fixed: false },
-  { id: 8, date: "2026-08-15", label: "CV选定确认", type: "dev", fixed: false },
-  { id: 9, date: "2026-08-28", label: "Demo配音完成", type: "dev", fixed: false },
-  { id: 10, date: "2026-08-31", label: "Trailer完成", type: "dev", fixed: false },
-  { id: 11, date: "2026-09-01", label: "Curator软接触开始", type: "marketing", fixed: false },
-  { id: 12, date: "2026-09-07", label: "Steam拉取trailer", type: "dev", fixed: true, note: "硬性deadline" },
-  { id: 13, date: "2026-09-14", label: "itch.io demo上线", type: "marketing", fixed: false, note: "前哨站" },
-  { id: 14, date: "2026-09-21", label: "Demo build提交Steam审核", type: "dev", fixed: true, note: "Press Preview" },
-  { id: 15, date: "2026-09-25", label: "宣发美工第二批素材交付", type: "marketing", fixed: false, note: "Next Fest物料" },
-  { id: 16, date: "2026-10-01", label: "Curator正式发key", type: "marketing", fixed: false },
-  { id: 17, date: "2026-10-05", label: "Next Fest素材最终提交", type: "dev", fixed: true, note: "硬性deadline" },
-  { id: 18, date: "2026-10-19", label: "★ Steam Next Fest", type: "marketing", fixed: true, important: true, note: "10/19-10/26 全力运营" },
-  { id: 19, date: "2026-10-28", label: "Next Fest复盘+杂谈第二批", type: "marketing", fixed: false },
-  { id: 20, date: "2026-11-15", label: "全部美术完成", type: "dev", fixed: false },
-  { id: 21, date: "2026-11-24", label: "音乐创作完成→混音母带", type: "dev", fixed: true, note: "与Kevin约定" },
-  { id: 22, date: "2026-12-01", label: "正式版review key发送", type: "marketing", fixed: false, note: "KOL/curator" },
-  { id: 23, date: "2026-12-15", label: "全部配音完成", type: "dev", fixed: false },
-  { id: 24, date: "2026-12-28", label: "正式版内容完成", type: "dev", fixed: false, important: true },
-  { id: 25, date: "2027-01-05", label: "混音母带完成+正式版送审", type: "dev", fixed: true, important: true },
-  { id: 26, date: "2027-01-08", label: "发售倒计时宣传", type: "marketing", fixed: false, note: "社媒+杂谈收尾" },
-  { id: 27, date: "2027-01-19", label: "🚀 发售", type: "launch", fixed: true, important: true },
+const TYPES={
+  script:{label:"剧本",color:"#06b6d4",bg:"#0c2a33",badgeBg:"rgba(6,182,212,0.15)"},
+  art:{label:"美术",color:"#ec4899",bg:"#2d1527",badgeBg:"rgba(236,72,153,0.15)"},
+  music:{label:"音乐",color:"#f59e0b",bg:"#2a1f0d",badgeBg:"rgba(245,158,11,0.15)"},
+  voice:{label:"配音",color:"#22c55e",bg:"#0d2818",badgeBg:"rgba(34,197,94,0.15)"},
+  marketing:{label:"宣发",color:"#a855f7",bg:"#2a1f35",badgeBg:"rgba(168,85,247,0.15)"},
+  dev:{label:"综合",color:"#3b82f6",bg:"#1a2744",badgeBg:"rgba(59,130,246,0.15)"},
+  launch:{label:"发售",color:"#ef4444",bg:"#3b1c1c",badgeBg:"rgba(239,68,68,0.15)"},
+};
+const FILTERS=[{key:"all",label:"全部"},{key:"script",label:"剧本"},{key:"art",label:"美术"},{key:"music",label:"音乐"},{key:"voice",label:"配音"},{key:"marketing",label:"宣发"},{key:"dev",label:"综合"}];
+
+const INITIAL_EVENTS=[
+  {id:1,date:"2026-05-16",label:"商店页Coming Soon上线",type:"marketing",fixed:true},
+  {id:2,date:"2026-05-31",label:"编辑确定并开始工作",type:"script",fixed:false,note:"优先demo部分"},
+  {id:3,date:"2026-05-18",label:"杂谈第一批开始发布",type:"marketing",fixed:false,note:"每周一篇，共3-5篇"},
+  {id:28,date:"2026-05-20",label:"Kevin优先交付demo用BGM",type:"music",fixed:false},
+  {id:4,date:"2026-06-07",label:"Demo完成（除配音外）",type:"dev",fixed:false,important:true},
+  {id:5,date:"2026-06-15",label:"观察六月Next Fest",type:"marketing",fixed:true,note:"6/15-6/22"},
+  {id:29,date:"2026-06-20",label:"CV物色开始",type:"voice",fixed:false,note:"听demo reel/建立判断标准"},
+  {id:6,date:"2026-07-01",label:"宣发美工第一批素材交付",type:"art",fixed:false,note:"capsule排版/社媒模板"},
+  {id:7,date:"2026-07-15",label:"全本剧本定稿",type:"script",fixed:false,important:true},
+  {id:30,date:"2026-07-20",label:"CV试音+正式接触",type:"voice",fixed:false},
+  {id:8,date:"2026-08-15",label:"CV选定确认",type:"voice",fixed:false,important:true},
+  {id:9,date:"2026-08-28",label:"Demo配音完成",type:"voice",fixed:false},
+  {id:10,date:"2026-08-31",label:"Trailer完成",type:"marketing",fixed:false},
+  {id:11,date:"2026-09-01",label:"Curator软接触开始",type:"marketing",fixed:false},
+  {id:12,date:"2026-09-07",label:"Steam拉取trailer",type:"dev",fixed:true,note:"硬性deadline"},
+  {id:13,date:"2026-09-14",label:"itch.io demo上线",type:"marketing",fixed:false,note:"前哨站"},
+  {id:14,date:"2026-09-21",label:"Demo build提交Steam审核",type:"dev",fixed:true,note:"Press Preview"},
+  {id:15,date:"2026-09-25",label:"宣发美工第二批素材交付",type:"art",fixed:false,note:"Next Fest物料"},
+  {id:16,date:"2026-10-01",label:"Curator正式发key",type:"marketing",fixed:false},
+  {id:17,date:"2026-10-05",label:"Next Fest素材最终提交",type:"dev",fixed:true,note:"硬性deadline"},
+  {id:18,date:"2026-10-19",label:"★ Steam Next Fest",type:"marketing",fixed:true,important:true,note:"10/19-10/26 全力运营"},
+  {id:19,date:"2026-10-28",label:"Next Fest复盘+杂谈第二批",type:"marketing",fixed:false},
+  {id:20,date:"2026-11-15",label:"全部游戏内美术完成",type:"art",fixed:false,important:true},
+  {id:21,date:"2026-11-24",label:"音乐创作完成→混音母带开始",type:"music",fixed:true,important:true,note:"与Kevin约定"},
+  {id:31,date:"2026-11-01",label:"全本配音录制开始",type:"voice",fixed:false},
+  {id:22,date:"2026-12-01",label:"正式版review key发送",type:"marketing",fixed:false,note:"KOL/curator"},
+  {id:23,date:"2026-12-15",label:"全部配音完成",type:"voice",fixed:false,important:true},
+  {id:24,date:"2026-12-28",label:"正式版内容完成",type:"dev",fixed:false,important:true},
+  {id:25,date:"2027-01-05",label:"混音母带完成+正式版送审",type:"music",fixed:true,important:true},
+  {id:26,date:"2027-01-08",label:"发售倒计时宣传",type:"marketing",fixed:false,note:"社媒+杂谈收尾"},
+  {id:27,date:"2027-01-19",label:"🚀 发售",type:"launch",fixed:true,important:true},
 ];
 
+const STORAGE_KEY = 'ess_timeline_events';
+const STORAGE_ID_KEY = 'ess_timeline_nextid';
+
+function saveToStorage() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(events)); localStorage.setItem(STORAGE_ID_KEY, String(nextId)); } catch(e) {}
+}
+function loadFromStorage() {
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if (s) { events = JSON.parse(s); const nid = localStorage.getItem(STORAGE_ID_KEY); if (nid) nextId = parseInt(nid); return true; }
+  } catch(e) {}
+  return false;
+}
+
 let events = JSON.parse(JSON.stringify(INITIAL_EVENTS));
-let filter = "all";
-let selectedId = null;
-let dragState = null;
+let nextId = 100;
+if (!loadFromStorage()) { events = JSON.parse(JSON.stringify(INITIAL_EVENTS)); }
 
-const START = new Date("2026-05-01");
-const END = new Date("2027-02-01");
-const TOTAL_DAYS = Math.ceil((END - START) / 86400000);
-const TOTAL_WIDTH = 2400;
-const ROW_HEIGHT = 56;
-const CARD_MIN_SPACING = 155;
+let filter="all",selectedId=null,deleteId=null,dragState=null;
 
-const MONTH_NAMES = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+const START=new Date("2026-05-01"),END=new Date("2027-02-01");
+const TOTAL_DAYS=Math.ceil((END-START)/86400000);
+const TOTAL_WIDTH=2400,ROW_HEIGHT=52,CARD_MIN_SPACING=148;
+const MONTH_NAMES=["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
 
-function daysBetween(a, b) { return Math.ceil((b - a) / 86400000); }
-function dateToPos(d) { return (daysBetween(START, new Date(d)) / TOTAL_DAYS) * TOTAL_WIDTH; }
-function posToDate(x) {
-  const days = Math.round((x / TOTAL_WIDTH) * TOTAL_DAYS);
-  const d = new Date(START);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-function formatDate(s) {
-  const d = new Date(s + "T00:00:00");
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
+function daysBetween(a,b){return Math.ceil((b-a)/86400000)}
+function dateToPos(d){return(daysBetween(START,new Date(d))/TOTAL_DAYS)*TOTAL_WIDTH}
+function posToDate(x){const d=Math.round((x/TOTAL_WIDTH)*TOTAL_DAYS);const r=new Date(START);r.setDate(r.getDate()+d);return r.toISOString().slice(0,10)}
+function formatDate(s){const d=new Date(s+"T00:00:00");return`${d.getMonth()+1}/${d.getDate()}`}
+function getMonths(){const m=[];let c=new Date(START);while(c<END){m.push(new Date(c));c=new Date(c.getFullYear(),c.getMonth()+1,1)}return m}
+function getFiltered(){return events.filter(ev=>{if(filter==="all")return true;if(ev.type==="launch")return true;return ev.type===filter}).sort((a,b)=>a.date.localeCompare(b.date))}
+function assignRows(evts){const r=[];return evts.map(ev=>{const p=dateToPos(ev.date);let row=0;while(r[row]!==undefined&&p-r[row]<CARD_MIN_SPACING)row++;r[row]=p;return{...ev,row}})}
 
-function getMonths() {
-  const months = [];
-  let cur = new Date(START);
-  while (cur < END) {
-    months.push(new Date(cur));
-    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-  }
-  return months;
-}
+function showPanel(name){['editPanel','addPanel','deletePanel'].forEach(id=>document.getElementById(id).classList.remove('visible'));if(name)document.getElementById(name+'Panel').classList.add('visible')}
 
-function getFilteredEvents() {
-  return events.filter(ev => {
-    if (filter === "all") return true;
-    if (ev.type === "launch") return true;
-    return ev.type === filter;
-  }).sort((a, b) => a.date.localeCompare(b.date));
-}
-
-function assignRows(evts) {
-  const rows = [];
-  return evts.map(ev => {
-    const pos = dateToPos(ev.date);
-    let row = 0;
-    while (rows[row] !== undefined && pos - rows[row] < CARD_MIN_SPACING) row++;
-    rows[row] = pos;
-    return { ...ev, row };
+function buildFilterBar(){
+  const bar=document.getElementById('filterBar');let h='';
+  FILTERS.forEach(f=>{const c=f.key==='all'?'#94a3b8':TYPES[f.key].color;h+=`<button class="filter-btn${filter===f.key?' active':''}" data-filter="${f.key}"><span class="filter-dot" style="background:${c}"></span>${f.label}</button>`});
+  h+=`<button class="btn-add" id="addBtn">+ 添加</button>`;
+  h+=`<button class="filter-btn" id="resetBtn" style="margin-left:2px">重置</button>`;
+  bar.innerHTML=h;
+  bar.querySelectorAll('.filter-btn[data-filter]').forEach(b=>{b.addEventListener('click',()=>{filter=b.dataset.filter;buildFilterBar();render()})});
+  document.getElementById('resetBtn').addEventListener('click',()=>{
+    if(!confirm('重置将恢复所有事件到初始状态，确定吗？'))return;
+    events=JSON.parse(JSON.stringify(INITIAL_EVENTS));nextId=100;selectedId=null;deleteId=null;showPanel(null);saveToStorage();render();
   });
+  document.getElementById('addBtn').addEventListener('click',()=>{showPanel('add');document.getElementById('addDate').value='';document.getElementById('addLabel').value='';document.getElementById('addType').value='dev';document.getElementById('addFixed').checked=false;document.getElementById('addImportant').checked=false;document.getElementById('addNote').value=''});
 }
 
-function render() {
-  const canvas = document.getElementById("timelineCanvas");
-  const listContainer = document.getElementById("eventListContainer");
-  const months = getMonths();
-  const filtered = getFilteredEvents();
-  const positioned = assignRows(filtered);
-  const maxRow = positioned.reduce((m, e) => Math.max(m, e.row), 0);
-  const timelineHeight = Math.max(500, (maxRow + 1) * ROW_HEIGHT + 100);
+function buildLegend(){
+  const bar=document.getElementById('legendBar');let h='';
+  Object.entries(TYPES).forEach(([k,t])=>{h+=`<span class="legend-item"><span class="legend-dot" style="background:${t.color}"></span> ${t.label}</span>`});
+  h+=`<span class="legend-item"><span class="legend-lock"></span> 锁定</span>`;
+  h+=`<span class="save-note">改动自动保存至浏览器</span>`;
+  bar.innerHTML=h;
+}
 
-  canvas.style.width = TOTAL_WIDTH + "px";
-  canvas.style.minHeight = timelineHeight + "px";
+function render(){
+  const canvas=document.getElementById("timelineCanvas"),listC=document.getElementById("eventListContainer");
+  const months=getMonths(),filtered=getFiltered(),positioned=assignRows(filtered);
+  const maxRow=positioned.reduce((m,e)=>Math.max(m,e.row),0);
+  const th=Math.max(520,(maxRow+1)*ROW_HEIGHT+100);
+  canvas.style.width=TOTAL_WIDTH+"px";canvas.style.minHeight=th+"px";
 
-  let html = '';
+  let html='<div class="month-bar">';const today=new Date();
+  months.forEach(m=>{const ms=daysBetween(START,m);const nm=new Date(m.getFullYear(),m.getMonth()+1,1);const me=daysBetween(START,nm>END?END:nm);const l=(ms/TOTAL_DAYS)*TOTAL_WIDTH,w=((me-ms)/TOTAL_DAYS)*TOTAL_WIDTH;const ic=today.getFullYear()===m.getFullYear()&&today.getMonth()===m.getMonth();const yp=m.getFullYear()===2027?"2027 ":"";html+=`<div class="month-label${ic?' current':''}" style="left:${l}px;width:${w}px">${yp}${MONTH_NAMES[m.getMonth()]}</div>`});
+  html+='</div>';
+  months.forEach(m=>{const l=(daysBetween(START,m)/TOTAL_DAYS)*TOTAL_WIDTH;html+=`<div class="grid-line" style="left:${l}px;bottom:0"></div>`});
+  const ts=today.toISOString().slice(0,10),tp=dateToPos(ts);
+  if(tp>0&&tp<TOTAL_WIDTH){html+=`<div class="today-line" style="left:${tp}px"></div><div class="today-label" style="left:${tp-20}px">今天</div>`}
 
-  // Month bar
-  html += '<div class="month-bar">';
-  const today = new Date();
-  months.forEach(m => {
-    const mStart = daysBetween(START, m);
-    const nextM = new Date(m.getFullYear(), m.getMonth() + 1, 1);
-    const mEnd = daysBetween(START, nextM > END ? END : nextM);
-    const left = (mStart / TOTAL_DAYS) * TOTAL_WIDTH;
-    const width = ((mEnd - mStart) / TOTAL_DAYS) * TOTAL_WIDTH;
-    const isCurrent = today.getFullYear() === m.getFullYear() && today.getMonth() === m.getMonth();
-    const yearPrefix = m.getFullYear() === 2027 ? "2027 " : "";
-    html += `<div class="month-label${isCurrent ? ' current' : ''}" style="left:${left}px;width:${width}px">${yearPrefix}${MONTH_NAMES[m.getMonth()]}</div>`;
+  html+='<div style="position:relative;padding-top:60px">';
+  positioned.forEach(ev=>{
+    const pos=dateToPos(ev.date),t=TYPES[ev.type];
+    const cls=['event-node',!ev.fixed?'draggable':'',selectedId===ev.id?'selected':''].filter(Boolean).join(' ');
+    const ds=`border-color:${t.color};${ev.important?`background:${t.color};box-shadow:0 0 8px ${t.color}50;`:'background:transparent;'}`;
+    const cbs=ev.fixed?'dashed':'solid';const cbc=selectedId===ev.id?'#f59e0b':`${t.color}40`;
+    html+=`<div class="${cls}" data-id="${ev.id}" style="left:${pos-4}px;top:${ev.row*ROW_HEIGHT}px">`;
+    html+=`<div class="event-stem" style="background:${t.color}"></div><div class="event-dot" style="${ds}"></div>`;
+    html+=`<div class="event-card" style="background:${t.bg};border:1px ${cbs} ${cbc}">`;
+    html+=`<div class="date-label">${formatDate(ev.date)}<span class="type-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>${ev.fixed?'<span class="lock-icon">🔒</span>':''}</div>`;
+    html+=`<div class="event-title${ev.important?' important':''}">${ev.label}</div>`;
+    if(ev.note)html+=`<div class="event-note">${ev.note}</div>`;
+    html+=`</div></div>`;
   });
-  html += '</div>';
+  html+='</div>';canvas.innerHTML=html;
 
-  // Grid lines
-  months.forEach(m => {
-    const left = (daysBetween(START, m) / TOTAL_DAYS) * TOTAL_WIDTH;
-    html += `<div class="grid-line" style="left:${left}px;bottom:0"></div>`;
+  let lh='';
+  filtered.forEach(ev=>{
+    const t=TYPES[ev.type],isSel=selectedId===ev.id;
+    lh+=`<div class="list-row${isSel?' selected-row':''}" data-id="${ev.id}">`;
+    lh+=`<span class="list-dot" style="background:${t.color}"></span>`;
+    lh+=`<span class="list-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>`;
+    lh+=`<span class="list-date ${ev.fixed?'locked':'editable'}" data-id="${ev.id}">${formatDate(ev.date)}</span>`;
+    lh+=`<span class="list-label${ev.important?' important':''}">${ev.label}</span>`;
+    if(ev.fixed)lh+=`<span style="font-size:9px;color:#f59e0b">🔒</span>`;
+    if(ev.note)lh+=`<span class="list-note">(${ev.note})</span>`;
+    lh+=`<button class="btn-del" data-del-id="${ev.id}" title="删除">×</button>`;
+    lh+=`</div>`;
   });
+  listC.innerHTML=lh;
 
-  // Today line
-  const todayStr = today.toISOString().slice(0, 10);
-  const todayPos = dateToPos(todayStr);
-  if (todayPos > 0 && todayPos < TOTAL_WIDTH) {
-    html += `<div class="today-line" style="left:${todayPos}px"></div>`;
-    html += `<div class="today-label" style="left:${todayPos - 20}px">今天</div>`;
-  }
-
-  // Events
-  html += '<div style="position:relative;padding-top:60px">';
-  positioned.forEach(ev => {
-    const pos = dateToPos(ev.date);
-    const classes = [
-      'event-node',
-      `type-${ev.type}`,
-      `fixed-${ev.fixed}`,
-      `important-${!!ev.important}`,
-      ev.fixed ? '' : 'draggable',
-      selectedId === ev.id ? 'selected' : '',
-    ].filter(Boolean).join(' ');
-
-    const dotBg = ev.important ? '' : 'background:transparent;';
-
-    html += `<div class="${classes}" data-id="${ev.id}" style="left:${pos - 4}px;top:${ev.row * ROW_HEIGHT}px">`;
-    html += `<div class="event-stem"></div>`;
-    html += `<div class="event-dot" style="${dotBg}"></div>`;
-    html += `<div class="event-card">`;
-    html += `<div class="date-label">${formatDate(ev.date)}${ev.fixed ? '<span class="lock-icon">🔒</span>' : ''}</div>`;
-    html += `<div class="event-title${ev.important ? ' important' : ''}">${ev.label}</div>`;
-    if (ev.note) html += `<div class="event-note">${ev.note}</div>`;
-    html += `</div></div>`;
-  });
-  html += '</div>';
-
-  canvas.innerHTML = html;
-
-  // Event list
-  let listHtml = '';
-  const dotColors = { dev: '#3b82f6', marketing: '#a855f7', launch: '#ef4444' };
-  filtered.forEach(ev => {
-    const isSelected = selectedId === ev.id;
-    listHtml += `<div class="list-row${isSelected ? ' selected-row' : ''}" data-id="${ev.id}">`;
-    listHtml += `<span class="list-dot" style="background:${dotColors[ev.type]}"></span>`;
-    listHtml += `<span class="list-date ${ev.fixed ? 'locked' : 'editable'}" data-action="edit" data-id="${ev.id}">${formatDate(ev.date)}</span>`;
-    listHtml += `<span class="list-label${ev.important ? ' important' : ''}">${ev.label}</span>`;
-    if (ev.fixed) listHtml += `<span style="font-size:9px;color:#f59e0b">🔒</span>`;
-    if (ev.note) listHtml += `<span class="list-note">(${ev.note})</span>`;
-    listHtml += `</div>`;
-  });
-  listContainer.innerHTML = listHtml;
-
-  // Bind drag events
-  document.querySelectorAll('.event-node.draggable').forEach(el => {
-    el.addEventListener('mousedown', onDragStart);
-    el.addEventListener('touchstart', onTouchStart, { passive: false });
-  });
-
-  // Bind list edit clicks
-  document.querySelectorAll('.list-date.editable').forEach(el => {
-    el.addEventListener('click', () => {
-      const id = parseInt(el.dataset.id);
-      openEdit(id);
-    });
-  });
-
-  // Bind card clicks for editing
-  document.querySelectorAll('.event-node.draggable .event-card').forEach(el => {
-    el.addEventListener('click', (e) => {
-      if (dragState && dragState.moved) return;
-      const id = parseInt(el.closest('.event-node').dataset.id);
-      openEdit(id);
-    });
-  });
+  document.querySelectorAll('.event-node.draggable').forEach(el=>{el.addEventListener('mousedown',onDragStart);el.addEventListener('touchstart',onTouchStart,{passive:false})});
+  document.querySelectorAll('.list-date.editable').forEach(el=>{el.addEventListener('click',()=>openEdit(parseInt(el.dataset.id)))});
+  document.querySelectorAll('.event-node.draggable .event-card').forEach(el=>{el.addEventListener('click',()=>{if(dragState&&dragState.moved)return;openEdit(parseInt(el.closest('.event-node').dataset.id))})});
+  document.querySelectorAll('.btn-del').forEach(el=>{el.addEventListener('click',(e)=>{e.stopPropagation();openDelete(parseInt(el.dataset.delId))})});
 }
 
-function openEdit(id) {
-  const ev = events.find(e => e.id === id);
-  if (!ev || ev.fixed) return;
-  selectedId = id;
-  const panel = document.getElementById('editPanel');
-  panel.classList.add('visible');
-  document.getElementById('editLabel').textContent = ev.label;
-  document.getElementById('editDateInput').value = ev.date;
-  render();
-}
+function openEdit(id){const ev=events.find(e=>e.id===id);if(!ev||ev.fixed)return;selectedId=id;deleteId=null;showPanel('edit');document.getElementById('editLabel').textContent=ev.label;document.getElementById('editDateInput').value=ev.date;render()}
+function openDelete(id){const ev=events.find(e=>e.id===id);if(!ev)return;deleteId=id;selectedId=null;showPanel('delete');document.getElementById('deleteLabel').textContent=`${formatDate(ev.date)} — ${ev.label}`;render()}
+function closeAll(){selectedId=null;deleteId=null;showPanel(null);render()}
 
-function closeEdit() {
-  selectedId = null;
-  document.getElementById('editPanel').classList.remove('visible');
-  render();
-}
+function onDragStart(e){const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);if(ev.fixed)return;e.preventDefault();dragState={id,startX:e.clientX,startPos:dateToPos(ev.date),moved:false};el.classList.add('dragging');document.addEventListener('mousemove',onDragMove);document.addEventListener('mouseup',onDragEnd)}
+function onDragMove(e){if(!dragState)return;const dx=e.clientX-dragState.startX;if(Math.abs(dx)>3)dragState.moved=true;const np=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));const nd=posToDate(np);const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(el){el.style.left=(np-4)+'px';el.style.transition='none';const dl=el.querySelector('.date-label');if(dl){const ev=events.find(e=>e.id===dragState.id),t=TYPES[ev.type];dl.innerHTML=`${formatDate(nd)}<span class="type-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>`}}events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev)}
+function onDragEnd(){if(dragState){const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(el)el.classList.remove('dragging')}document.removeEventListener('mousemove',onDragMove);document.removeEventListener('mouseup',onDragEnd);const wm=dragState?.moved;dragState=null;if(wm){saveToStorage();render()}}
+function onTouchStart(e){const el=e.currentTarget,id=parseInt(el.dataset.id);const ev=events.find(e=>e.id===id);if(ev.fixed)return;const t=e.touches[0];dragState={id,startX:t.clientX,startPos:dateToPos(ev.date),moved:false};el.classList.add('dragging');document.addEventListener('touchmove',onTouchMove,{passive:false});document.addEventListener('touchend',onTouchEnd)}
+function onTouchMove(e){if(!dragState)return;e.preventDefault();const t=e.touches[0],dx=t.clientX-dragState.startX;if(Math.abs(dx)>3)dragState.moved=true;const np=Math.max(0,Math.min(TOTAL_WIDTH,dragState.startPos+dx));const nd=posToDate(np);const el=document.querySelector(`.event-node[data-id="${dragState.id}"]`);if(el){el.style.left=(np-4)+'px';el.style.transition='none'}events=events.map(ev=>ev.id===dragState.id?{...ev,date:nd}:ev)}
+function onTouchEnd(){document.removeEventListener('touchmove',onTouchMove);document.removeEventListener('touchend',onTouchEnd);dragState=null;saveToStorage();render()}
 
-// Drag handling
-function onDragStart(e) {
-  const el = e.currentTarget;
-  const id = parseInt(el.dataset.id);
-  const ev = events.find(e => e.id === id);
-  if (ev.fixed) return;
-  e.preventDefault();
-  dragState = {
-    id,
-    startX: e.clientX,
-    startPos: dateToPos(ev.date),
-    moved: false,
-  };
-  el.classList.add('dragging');
-  document.addEventListener('mousemove', onDragMove);
-  document.addEventListener('mouseup', onDragEnd);
-}
+document.getElementById('editConfirm').addEventListener('click',()=>{const nd=document.getElementById('editDateInput').value;if(nd&&selectedId){events=events.map(ev=>ev.id===selectedId?{...ev,date:nd}:ev);saveToStorage();closeAll()}});
+document.getElementById('editCancel').addEventListener('click',closeAll);
 
-function onDragMove(e) {
-  if (!dragState) return;
-  const dx = e.clientX - dragState.startX;
-  if (Math.abs(dx) > 3) dragState.moved = true;
-  const newPos = Math.max(0, Math.min(TOTAL_WIDTH, dragState.startPos + dx));
-  const newDate = posToDate(newPos);
-  const el = document.querySelector(`.event-node[data-id="${dragState.id}"]`);
-  if (el) {
-    el.style.left = (newPos - 4) + 'px';
-    el.style.transition = 'none';
-    const dateLabel = el.querySelector('.date-label');
-    if (dateLabel) dateLabel.textContent = formatDate(newDate) + (events.find(e=>e.id===dragState.id).fixed ? ' 🔒' : '');
-  }
-  events = events.map(ev => ev.id === dragState.id ? { ...ev, date: newDate } : ev);
-}
-
-function onDragEnd() {
-  if (dragState) {
-    const el = document.querySelector(`.event-node[data-id="${dragState.id}"]`);
-    if (el) el.classList.remove('dragging');
-  }
-  document.removeEventListener('mousemove', onDragMove);
-  document.removeEventListener('mouseup', onDragEnd);
-  const wasMoved = dragState?.moved;
-  dragState = null;
-  if (wasMoved) render();
-}
-
-// Touch handling
-function onTouchStart(e) {
-  const el = e.currentTarget;
-  const id = parseInt(el.dataset.id);
-  const ev = events.find(e => e.id === id);
-  if (ev.fixed) return;
-  const touch = e.touches[0];
-  dragState = {
-    id,
-    startX: touch.clientX,
-    startPos: dateToPos(ev.date),
-    moved: false,
-  };
-  el.classList.add('dragging');
-  document.addEventListener('touchmove', onTouchMove, { passive: false });
-  document.addEventListener('touchend', onTouchEnd);
-}
-
-function onTouchMove(e) {
-  if (!dragState) return;
-  e.preventDefault();
-  const touch = e.touches[0];
-  const dx = touch.clientX - dragState.startX;
-  if (Math.abs(dx) > 3) dragState.moved = true;
-  const newPos = Math.max(0, Math.min(TOTAL_WIDTH, dragState.startPos + dx));
-  const newDate = posToDate(newPos);
-  const el = document.querySelector(`.event-node[data-id="${dragState.id}"]`);
-  if (el) {
-    el.style.left = (newPos - 4) + 'px';
-    el.style.transition = 'none';
-  }
-  events = events.map(ev => ev.id === dragState.id ? { ...ev, date: newDate } : ev);
-}
-
-function onTouchEnd() {
-  document.removeEventListener('touchmove', onTouchMove);
-  document.removeEventListener('touchend', onTouchEnd);
-  dragState = null;
-  render();
-}
-
-// Filter buttons
-document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    filter = btn.dataset.filter;
-    document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    render();
-  });
+document.getElementById('addConfirm').addEventListener('click',()=>{
+  const date=document.getElementById('addDate').value,label=document.getElementById('addLabel').value.trim();
+  const type=document.getElementById('addType').value,fixed=document.getElementById('addFixed').checked;
+  const important=document.getElementById('addImportant').checked,note=document.getElementById('addNote').value.trim();
+  if(!date||!label){alert('请填写日期和名称');return}
+  const ev={id:nextId++,date,label,type,fixed};
+  if(important)ev.important=true;if(note)ev.note=note;
+  events.push(ev);saveToStorage();showPanel(null);render();
 });
+document.getElementById('addCancel').addEventListener('click',()=>{showPanel(null)});
 
-// Reset
-document.getElementById('resetBtn').addEventListener('click', () => {
-  events = JSON.parse(JSON.stringify(INITIAL_EVENTS));
-  selectedId = null;
-  closeEdit();
-  render();
-});
+document.getElementById('deleteConfirm').addEventListener('click',()=>{if(deleteId){events=events.filter(ev=>ev.id!==deleteId);saveToStorage();closeAll()}});
+document.getElementById('deleteCancel').addEventListener('click',closeAll);
 
-// Edit panel
-document.getElementById('editConfirm').addEventListener('click', () => {
-  const newDate = document.getElementById('editDateInput').value;
-  if (newDate && selectedId) {
-    events = events.map(ev => ev.id === selectedId ? { ...ev, date: newDate } : ev);
-    closeEdit();
-  }
-});
-
-document.getElementById('editCancel').addEventListener('click', closeEdit);
-
-// Initial render
-render();
-
-// Scroll to today
-setTimeout(() => {
-  const scroll = document.getElementById('timelineScroll');
-  const todayPos = dateToPos(new Date().toISOString().slice(0, 10));
-  scroll.scrollLeft = Math.max(0, todayPos - 200);
-}, 100);
+buildFilterBar();buildLegend();render();
+setTimeout(()=>{const s=document.getElementById('timelineScroll');s.scrollLeft=Math.max(0,dateToPos(new Date().toISOString().slice(0,10))-200)},100);
 </script>
-
 </body>
 </html>
