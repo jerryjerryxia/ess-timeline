@@ -65,9 +65,9 @@
   .event-node.dragging .event-card{box-shadow:0 4px 20px rgba(0,0,0,0.4)}
   .event-card .date-label{font-size:10px;color:#94a3b8;margin-bottom:1px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:4px}
   .event-card .type-badge{font-size:9px;padding:0 4px;border-radius:3px;font-weight:600;letter-spacing:0.3px}
-  .event-card .event-title{font-size:11px;font-weight:500;line-height:1.35;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .event-card .event-title.important{font-weight:700;color:#f8fafc;white-space:normal}
-  .event-card .event-note{font-size:9px;color:#94a3b8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .event-card .event-title{font-size:11px;font-weight:500;line-height:1.35;color:#e2e8f0;word-break:break-word;overflow-wrap:break-word}
+  .event-card .event-title.important{font-weight:700;color:#f8fafc}
+  .event-card .event-note{font-size:9px;color:#94a3b8;margin-top:1px;line-height:1.3;word-break:break-word;overflow-wrap:break-word}
   .lock-icon{color:#f59e0b;font-size:9px}
 
   .event-list{padding:20px 28px;border-top:1px solid #1e293b}
@@ -217,13 +217,33 @@ function formatDate(s){const d=new Date(s+"T00:00:00");return`${d.getMonth()+1}/
 function getMonths(){const m=[];let c=new Date(START);while(c<END){m.push(new Date(c));c=new Date(c.getFullYear(),c.getMonth()+1,1)}return m}
 function getFiltered(){return events.filter(ev=>{if(filter==="all")return true;if(ev.type==="launch")return true;return ev.type===filter}).sort((a,b)=>a.date.localeCompare(b.date))}
 
-function cardH(ev){let h=14;h+=12;h+=16;if(ev.important)h+=14;if(ev.note)h+=13;h+=10;return h}
+function measureCardHeights(evts){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:absolute;left:0;top:-99999px;visibility:hidden';
+  document.body.appendChild(wrap);
+  const heights={};
+  evts.forEach(ev=>{
+    const t=TYPES[ev.type];
+    const card=document.createElement('div');
+    card.className='event-card';
+    card.style.cssText=`position:static;background:${t.bg};border:1px solid ${t.color}40`;
+    let inner=`<div class="date-label">${formatDate(ev.date)}<span class="type-badge" style="background:${t.badgeBg};color:${t.color}">${t.label}</span>${ev.fixed?'<span class="lock-icon">🔒</span>':''}</div>`;
+    inner+=`<div class="event-title${ev.important?' important':''}">${ev.label}</div>`;
+    if(ev.note)inner+=`<div class="event-note">${ev.note}</div>`;
+    card.innerHTML=inner;
+    wrap.appendChild(card);
+    heights[ev.id]=card.offsetHeight+14;
+    wrap.removeChild(card);
+  });
+  document.body.removeChild(wrap);
+  return heights;
+}
 
-function layoutEvents(evts){
+function layoutEvents(evts,heights){
   const placed=[];
   const result=evts.map(ev=>{
     if(typeof ev.customTop==='number'){
-      const x=dateToPos(ev.date);const h=cardH(ev);
+      const x=dateToPos(ev.date);const h=heights[ev.id];
       placed.push({left:x-10,right:x+CARD_W,top:ev.customTop,bottom:ev.customTop+h,id:ev.id});
       return{...ev,pxTop:ev.customTop};
     }
@@ -231,7 +251,7 @@ function layoutEvents(evts){
   });
   for(let i=0;i<result.length;i++){
     if(result[i].pxTop!==-1)continue;
-    const ev=result[i];const x=dateToPos(ev.date);const h=cardH(ev);
+    const ev=result[i];const x=dateToPos(ev.date);const h=heights[ev.id];
     const left=x-10,right=x+CARD_W;
     const hOverlaps=placed.filter(p=>left<p.right&&right>p.left);
     let y=0;
@@ -285,8 +305,10 @@ function buildLegend(){
 
 function render(){
   const canvas=document.getElementById("timelineCanvas"),listC=document.getElementById("eventListContainer");
-  const months=getMonths(),filtered=getFiltered(),positioned=layoutEvents(filtered);
-  const maxBottom=positioned.reduce((m,e)=>Math.max(m,e.pxTop+cardH(e)),0);
+  const months=getMonths(),filtered=getFiltered();
+  const heights=measureCardHeights(filtered);
+  const positioned=layoutEvents(filtered,heights);
+  const maxBottom=positioned.reduce((m,e)=>Math.max(m,e.pxTop+heights[e.id]),0);
   const th=Math.max(400,maxBottom+100);
   canvas.style.width=TOTAL_WIDTH+"px";canvas.style.minHeight=th+"px";
 
